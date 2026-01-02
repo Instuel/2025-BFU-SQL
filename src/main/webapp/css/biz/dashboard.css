@@ -1,0 +1,839 @@
+/*
+  dashboard.css
+  智慧能源管理系统 - 大屏展示专用样式
+  Visual direction: 现代企业级应用风格
+  - 仪表盘展示
+  - 决策总览
+  - 系统状态
+  - 数据可视化
+*/
+
+/* ======================= */
+/* 仪表盘页面             */
+/* ======================= */
+
+.dashboard-container {
+    padding: 32px;
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    min-height: 100vh;
+}
+
+.dashboard-header {
+    margin-bottom: 32px;
+}
+
+.dashboard-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 8px;
+}
+
+.dashboard-header p {
+    color: #64748b;
+    font-size: 15px;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+.dashboard-stat-card {
+    background: white;
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+}
+
+.dashboard-stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.dashboard-stat-card.energy::before {
+    background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+}
+
+.dashboard-stat-card.pv::before {
+    background: linear-gradient(180deg, #f093fb 0%, #f5576c 100%);
+}
+
+.dashboard-stat-card.alarm::before {
+    background: linear-gradient(180deg, #ff6b6b 0%, #ee5a5a 100%);
+}
+
+.dashboard-stat-card.efficiency::before {
+    background: linear-gradient(180deg, #26de81 0%, #20bf6b 100%);
+}
+
+.dashboard-stat-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #64748b;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.dashboard-stat-value {
+    font-size: 36px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 8px;
+    line-height: 1.2;
+}
+
+.dashboard-stat-trend {
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+}
+
+.dashboard-stat-trend.up {
+    color: #10b981;
+}
+
+.dashboard-stat-trend.down {
+    color: #ef4444;
+}
+
+.dashboard-chart-section {
+    background: white;
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    margin-bottom: 24px;
+}
+
+.dashboard-chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.dashboard-chart-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.dashboard-chart-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.dashboard-chart-action-btn {
+    padding: 8px 16px;
+    border: 2px solid #e2e8f0;
+    background: white;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.dashboard-chart-action-btn:hover {
+    border-color: #667eea;
+    color: #667eea;
+}
+
+.dashboard-chart-container {
+    height: 350px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 14px;
+}
+
+/* ======================= */
+/* 决策总览页面           */
+/* ======================= */
+
+.overview-container {
+    padding: 32px 48px;
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    min-height: 100vh;
+}
+
+.overview-header {
+    margin-bottom: 32px;
+}
+
+.overview-header h1 {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 8px;
+}
+
+.overview-header p {
+    color: #64748b;
+    font-size: 15px;
+}
+
+.overview-chart-section {
+    background: white;
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    margin-bottom: 24px;
+}
+
+.overview-chart-container {
+    height: 300px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 14px;
+}
+
+/* 图表区块标题 */
+.chart-section {
+    background: white;
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    margin-bottom: 24px;
+}
+
+.chart-section .section-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.chart-container {
+    height: 280px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 14px;
+}
+
+/* 告警列表 */
+.alarm-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.alarm-item {
+    padding: 16px;
+    background: #f8fafc;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    border-left: 4px solid #e2e8f0;
+    transition: all 0.2s ease;
+}
+
+.alarm-item:hover {
+    background: #f1f5f9;
+}
+
+.alarm-item:last-child {
+    margin-bottom: 0;
+}
+
+.alarm-level {
+    display: inline-block;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 20px;
+    margin-bottom: 8px;
+}
+
+.alarm-level.high {
+    background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+    color: #dc2626;
+}
+
+.alarm-level.medium {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    color: #d97706;
+}
+
+.alarm-level.low {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    color: #2563eb;
+}
+
+.alarm-time {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-bottom: 6px;
+}
+
+.alarm-content {
+    font-size: 14px;
+    color: #334155;
+    margin-bottom: 6px;
+    line-height: 1.5;
+}
+
+.alarm-device {
+    font-size: 13px;
+    color: #64748b;
+}
+
+/* 内容网格布局 */
+.content-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 24px;
+}
+
+.main-content {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.side-content {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* ======================= */
+/* 系统管理员工作台       */
+/* ======================= */
+
+.admin-workspace-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 28px;
+    padding: 32px 48px;
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    min-height: 100vh;
+}
+
+.admin-workspace-header {
+    grid-column: 1 / -1;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 48px;
+    border-radius: 20px;
+    color: white;
+    position: relative;
+    overflow: hidden;
+}
+
+.admin-workspace-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 500px;
+    height: 100%;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='80' cy='20' r='50' fill='rgba(255,255,255,0.05)'/%3E%3Ccircle cx='100' cy='80' r='40' fill='rgba(255,255,255,0.03)'/%3E%3C/svg%3E") no-repeat;
+    background-size: cover;
+}
+
+.admin-workspace-header h1 {
+    font-size: 36px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    position: relative;
+    z-index: 1;
+}
+
+.admin-workspace-header p {
+    font-size: 16px;
+    opacity: 0.9;
+    position: relative;
+    z-index: 1;
+}
+
+.admin-module-card {
+    background: white;
+    border-radius: 20px;
+    padding: 32px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    border: 2px solid transparent;
+    position: relative;
+    overflow: hidden;
+}
+
+.admin-module-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, transparent 100%);
+    border-radius: 0 0 0 100px;
+}
+
+.admin-module-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+    border-color: #667eea;
+}
+
+.admin-module-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    font-size: 36px;
+}
+
+.admin-module-icon.rbac {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.admin-module-icon.alarm {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+.admin-module-icon.param {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+}
+
+.admin-module-icon.db {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    color: white;
+}
+
+.admin-module-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 12px;
+}
+
+.admin-module-desc {
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1.7;
+    margin-bottom: 24px;
+}
+
+.admin-module-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    padding-top: 24px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.admin-stat-item {
+    text-align: center;
+}
+
+.admin-stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 4px;
+}
+
+.admin-stat-label {
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+.admin-system-status {
+    grid-column: 1 / -1;
+    background: white;
+    border-radius: 20px;
+    padding: 28px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    margin-top: 8px;
+}
+
+.admin-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.admin-status-item {
+    padding: 20px;
+    border-radius: 12px;
+    background: #f8fafc;
+    position: relative;
+    overflow: hidden;
+}
+
+.admin-status-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+}
+
+.admin-status-item.normal::before {
+    background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+}
+
+.admin-status-item.warning::before {
+    background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+}
+
+.admin-status-item.error::before {
+    background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+}
+
+.admin-status-label {
+    font-size: 14px;
+    color: #64748b;
+    margin-bottom: 8px;
+}
+
+.admin-status-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.admin-quick-actions {
+    grid-column: 1 / -1;
+    background: white;
+    border-radius: 20px;
+    padding: 28px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    margin-top: 8px;
+}
+
+.admin-section-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 24px;
+}
+
+.admin-action-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.admin-action-btn {
+    padding: 14px 24px;
+    border: none;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.admin-action-btn.primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.admin-action-btn.primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+}
+
+.admin-action-btn.success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+}
+
+.admin-action-btn.success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+}
+
+.admin-action-btn.warning {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+}
+
+.admin-action-btn.warning:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(245, 158, 11, 0.3);
+}
+
+.admin-action-btn.danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+}
+
+.admin-action-btn.danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(239, 68, 68, 0.3);
+}
+
+/* ======================= */
+/* 模块图标               */
+/* ======================= */
+
+.module-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    font-size: 32px;
+}
+
+.module-icon.large {
+    width: 80px;
+    height: 80px;
+    border-radius: 20px;
+    font-size: 40px;
+    margin-bottom: 24px;
+}
+
+.module-icon.pv {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+.module-icon.energy {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.module-icon.overview {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.module-icon.report {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+.module-icon.alarm {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+    color: white;
+}
+
+.module-icon.success {
+    background: linear-gradient(135deg, #26de81 0%, #20bf6b 100%);
+    color: white;
+}
+
+/* ======================= */
+/* 模块内容               */
+/* ======================= */
+
+.module-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 8px;
+}
+
+.module-title.large {
+    font-size: 26px;
+    margin-bottom: 16px;
+}
+
+.module-desc {
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1.7;
+    margin-bottom: 20px;
+}
+
+.module-stats {
+    display: flex;
+    gap: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.module-stats.grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.stat-item {
+    flex: 1;
+}
+
+.stat-item.center {
+    text-align: center;
+}
+
+/* ======================= */
+/* 最近任务区             */
+/* ======================= */
+
+.recent-tasks {
+    grid-column: 1 / -1;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-2xl);
+    box-shadow: var(--shadow-sm);
+}
+
+.recent-tasks h2 {
+    font-size: var(--font-size-xl);
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-lg);
+}
+
+.task-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.task-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-normal);
+}
+
+.task-item:hover {
+    background: var(--border-light);
+}
+
+.task-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.task-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-lg);
+}
+
+.task-icon.analysis {
+    background: #e6f7ff;
+    color: var(--color-info);
+}
+
+.task-icon.report {
+    background: #f6ffed;
+    color: var(--color-success);
+}
+
+.task-icon.model {
+    background: #fff7e6;
+    color: var(--color-warning);
+}
+
+.task-name {
+    font-size: var(--font-size-base);
+    color: var(--text-primary);
+}
+
+.task-time {
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+}
+
+.task-status {
+    padding: var(--spacing-xs) var(--spacing-lg);
+    border-radius: 12px;
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+}
+
+.task-status.pending {
+    background: #fff7e6;
+    color: var(--color-warning);
+}
+
+.task-status.completed {
+    background: #f6ffed;
+    color: var(--color-success);
+}
+
+.task-status.inprogress {
+    background: #e6f7ff;
+    color: var(--color-info);
+}
+
+/* ======================= */
+/* 响应式设计             */
+/* ======================= */
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-workspace-container {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-module-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-status-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-action-buttons {
+        flex-direction: column;
+    }
+
+    .admin-action-buttons .admin-action-btn {
+        width: 100%;
+    }
+
+    .module-stats.grid {
+        grid-template-columns: 1fr;
+    }
+}
