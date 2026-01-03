@@ -1,11 +1,11 @@
 /* ============================================================
-   ÖÇ»ÛÄÜÔ´¹ÜÀíÏµÍ³ (Smart Energy Management System)
-   Êı¾İ¿â³õÊ¼»¯½Å±¾
-   °æ±¾: 1.0
-   Éú³ÉÈÕÆÚ: 2026-01-01
+   æ™ºæ…§èƒ½æºç®¡ç†ç³»ç»Ÿ (Smart Energy Management System)
+   æ•°æ®åº“åˆå§‹åŒ–è„šæœ¬
+   ç‰ˆæœ¬: 1.0
+   ç”Ÿæˆæ—¥æœŸ: 2026-01-01
    ============================================================ */
 
--- 1. ´´½¨Êı¾İ¿â
+-- 1. åˆ›å»ºæ•°æ®åº“
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'SQL_BFU')
 BEGIN
     CREATE DATABASE SQL_BFU;
@@ -16,10 +16,10 @@ USE SQL_BFU;
 GO
 
 /* ============================================================
-   µÚÒ»²¿·Ö£º»ù´¡ÏµÍ³ÓëÈËÔ±È¨ÏŞ±í
+   ç¬¬ä¸€éƒ¨åˆ†ï¼šåŸºç¡€ç³»ç»Ÿä¸äººå‘˜æƒé™è¡¨
    ============================================================ */
 
--- 1. ÏµÍ³ÈËÔ±±í (System Users)
+-- 1. ç³»ç»Ÿäººå‘˜è¡¨ (System Users)
 IF OBJECT_ID('Sys_User', 'U') IS NOT NULL DROP TABLE Sys_User;
 CREATE TABLE Sys_User (
     User_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -29,62 +29,62 @@ CREATE TABLE Sys_User (
     Real_Name NVARCHAR(50) NOT NULL,
     Department NVARCHAR(100),
     Contact_Phone NVARCHAR(20),
-    Account_Status TINYINT DEFAULT 1, -- 1-Õı³£, 0-¶³½á
+    Account_Status TINYINT DEFAULT 1, -- 1-æ­£å¸¸, 0-å†»ç»“
     Created_Time DATETIME2(0) DEFAULT SYSDATETIME(),
     
-    -- Ë÷Òı£ºµÇÂ¼ÕËºÅÎ¨Ò»
+    -- ç´¢å¼•ï¼šç™»å½•è´¦å·å”¯ä¸€
     CONSTRAINT UQ_Sys_User_Login UNIQUE (Login_Account)
 );
 
--- 2. ½ÇÉ«±í¶¨Òå (²¹³ä¶¨Òå£¬ÓÃÓÚÖ§³ÖÒµÎñ±íÍâ¼ü)
--- 2.1 ÏµÍ³¹ÜÀíÔ±
+-- 2. è§’è‰²è¡¨å®šä¹‰ (è¡¥å……å®šä¹‰ï¼Œç”¨äºæ”¯æŒä¸šåŠ¡è¡¨å¤–é”®)
+-- 2.1 ç³»ç»Ÿç®¡ç†å‘˜
 CREATE TABLE Role_SysAdmin (
     Admin_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     User_ID BIGINT NOT NULL,
     CONSTRAINT FK_SysAdmin_User FOREIGN KEY (User_ID) REFERENCES Sys_User(User_ID)
 );
 
--- 2.2 ÔËÎ¬ÈËÔ±
+-- 2.2 è¿ç»´äººå‘˜
 CREATE TABLE Role_OandM (
     OandM_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     User_ID BIGINT NOT NULL,
     CONSTRAINT FK_OandM_User FOREIGN KEY (User_ID) REFERENCES Sys_User(User_ID)
 );
 
--- 2.3 ÄÜÔ´¹ÜÀíÔ±
+-- 2.3 èƒ½æºç®¡ç†å‘˜
 CREATE TABLE Role_EnergyMgr (
     EnergyMgr_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     User_ID BIGINT NOT NULL,
     CONSTRAINT FK_EnergyMgr_User FOREIGN KEY (User_ID) REFERENCES Sys_User(User_ID)
 );
 
--- 2.4 Êı¾İ·ÖÎöÊ¦
+-- 2.4 æ•°æ®åˆ†æå¸ˆ
 CREATE TABLE Role_Analyst (
     Analyst_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     User_ID BIGINT NOT NULL,
     CONSTRAINT FK_Analyst_User FOREIGN KEY (User_ID) REFERENCES Sys_User(User_ID)
 );
 
--- 2.5 ÆóÒµ¹ÜÀí²ã
+-- 2.5 ä¼ä¸šç®¡ç†å±‚
 CREATE TABLE Role_Manager (
     Manager_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     User_ID BIGINT NOT NULL,
     CONSTRAINT FK_Manager_User FOREIGN KEY (User_ID) REFERENCES Sys_User(User_ID)
 );
 
--- 2.6 ÔËÎ¬¹¤µ¥ÈËÔ±
+-- 2.6 è¿ç»´å·¥å•äººå‘˜
 CREATE TABLE Role_Dispatcher (
     Dispatcher_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     User_ID BIGINT NOT NULL,
     CONSTRAINT FK_Dispatcher_User FOREIGN KEY (User_ID) REFERENCES Sys_User(User_ID)
 );
 
--- 3. ÈËÔ±½ÇÉ«·ÖÅä±í (Role Assignment)
+-- 3. äººå‘˜è§’è‰²åˆ†é…è¡¨ (Role Assignment)
 CREATE TABLE Sys_Role_Assignment (
     Assignment_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     User_ID BIGINT NOT NULL,
     Role_Type NVARCHAR(20) NOT NULL, -- ADMIN, OM, ENERGY, ANALYST, EXEC, DEISPATCHER
-    Assigned_By BIGINT NULL, -- ÏµÍ³¹ÜÀíÔ±ID
+    Assigned_By BIGINT NULL, -- ç³»ç»Ÿç®¡ç†å‘˜ID
     Assigned_Time DATETIME2(0) DEFAULT SYSDATETIME(),
 
     CONSTRAINT FK_Assignment_User FOREIGN KEY (User_ID) REFERENCES Sys_User(User_ID),
@@ -94,86 +94,86 @@ CREATE TABLE Sys_Role_Assignment (
 
 
 /* ============================================================
-   µÚ¶ş²¿·Ö£º¹«¹²»ù´¡ĞÅÏ¢ÓëÉè±¸Ì¨ÕË
+   ç¬¬äºŒéƒ¨åˆ†ï¼šå…¬å…±åŸºç¡€ä¿¡æ¯ä¸è®¾å¤‡å°è´¦
    ============================================================ */
 
--- 4. ³§ÇøĞÅÏ¢±í (Factory Info)
+-- 4. å‚åŒºä¿¡æ¯è¡¨ (Factory Info)
 CREATE TABLE Base_Factory (
     Factory_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     Factory_Name NVARCHAR(64) NOT NULL,
     Area_Desc NVARCHAR(200),
-    Manager_User_ID BIGINT NULL, -- ¸ºÔğÈËID (ÏµÍ³ÈËÔ±)
+    Manager_User_ID BIGINT NULL, -- è´Ÿè´£äººID (ç³»ç»Ÿäººå‘˜)
 
     CONSTRAINT FK_Factory_Manager FOREIGN KEY (Manager_User_ID) REFERENCES Sys_User(User_ID)
 );
 
--- 5. Éè±¸Ì¨ÕË±í (Device Ledger) - ºËĞÄ×Ê²ú±í
+-- 5. è®¾å¤‡å°è´¦è¡¨ (Device Ledger) - æ ¸å¿ƒèµ„äº§è¡¨
 CREATE TABLE Device_Ledger (
     Ledger_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     Device_Name NVARCHAR(50) NOT NULL,
-    Device_Type NVARCHAR(20) NOT NULL, -- ±äÑ¹Æ÷, Ë®±í, Äæ±äÆ÷µÈ
+    Device_Type NVARCHAR(20) NOT NULL, -- å˜å‹å™¨, æ°´è¡¨, é€†å˜å™¨ç­‰
     Model_Spec NVARCHAR(50),
     Install_Time DATE,
-    Scrap_Status NVARCHAR(20) DEFAULT 'Õı³£Ê¹ÓÃ',
+    Scrap_Status NVARCHAR(20) DEFAULT 'æ­£å¸¸ä½¿ç”¨',
 
-    CONSTRAINT CK_Device_Type CHECK (Device_Type IN ('±äÑ¹Æ÷','Ë®±í','Äæ±äÆ÷','»ãÁ÷Ïä','µç±í','Æø±í','ÆäËû')),
-    CONSTRAINT CK_Scrap_Status CHECK (Scrap_Status IN ('Õı³£Ê¹ÓÃ','ÒÑ±¨·Ï'))
+    CONSTRAINT CK_Device_Type CHECK (Device_Type IN ('å˜å‹å™¨','æ°´è¡¨','é€†å˜å™¨','æ±‡æµç®±','ç”µè¡¨','æ°”è¡¨','å…¶ä»–')),
+    CONSTRAINT CK_Scrap_Status CHECK (Scrap_Status IN ('æ­£å¸¸ä½¿ç”¨','å·²æŠ¥åºŸ'))
 );
 
 
 /* ============================================================
-   µÚÈı²¿·Ö£ºÅäµçÍø¼à²âÒµÎñÏß
+   ç¬¬ä¸‰éƒ¨åˆ†ï¼šé…ç”µç½‘ç›‘æµ‹ä¸šåŠ¡çº¿
    ============================================================ */
 
--- 6. Åäµç·¿±í (Distribution Room)
+-- 6. é…ç”µæˆ¿è¡¨ (Distribution Room)
 CREATE TABLE Dist_Room (
     Room_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     Room_Name NVARCHAR(50) NOT NULL,
     Location NVARCHAR(100),
     Voltage_Level NVARCHAR(10),
     Manager_User_ID BIGINT,
-    Factory_ID BIGINT, -- ³§ÇøÍâ¼üÒÔÖ§³Ö²éÑ¯ÓÅ»¯
+    Factory_ID BIGINT, -- å‚åŒºå¤–é”®ä»¥æ”¯æŒæŸ¥è¯¢ä¼˜åŒ–
 
     CONSTRAINT FK_Room_Manager FOREIGN KEY (Manager_User_ID) REFERENCES Sys_User(User_ID),
     CONSTRAINT FK_Room_Factory FOREIGN KEY (Factory_ID) REFERENCES Base_Factory(Factory_ID)
 );
 
--- 7. ±äÑ¹Æ÷±í (Transformer)
+-- 7. å˜å‹å™¨è¡¨ (Transformer)
 CREATE TABLE Dist_Transformer (
     Transformer_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     Transformer_Name NVARCHAR(100),
     Room_ID BIGINT NOT NULL,
-    Ledger_ID BIGINT NULL, -- ¹ØÁªÌ¨ÕË
+    Ledger_ID BIGINT NULL, -- å…³è”å°è´¦
     
     CONSTRAINT FK_Trans_Room FOREIGN KEY (Room_ID) REFERENCES Dist_Room(Room_ID),
     CONSTRAINT FK_Trans_Ledger FOREIGN KEY (Ledger_ID) REFERENCES Device_Ledger(Ledger_ID)
 );
 
--- 8. »ØÂ·±í (Circuit)
+-- 8. å›è·¯è¡¨ (Circuit)
 CREATE TABLE Dist_Circuit (
     Circuit_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     Circuit_Name NVARCHAR(100),
     Room_ID BIGINT NOT NULL,
-    Ledger_ID BIGINT NULL, -- ¹ØÁªÌ¨ÕË
+    Ledger_ID BIGINT NULL, -- å…³è”å°è´¦
 
     CONSTRAINT FK_Circuit_Room FOREIGN KEY (Room_ID) REFERENCES Dist_Room(Room_ID),
     CONSTRAINT FK_Circuit_Ledger FOREIGN KEY (Ledger_ID) REFERENCES Device_Ledger(Ledger_ID)
 );
 
--- 9. ±äÑ¹Æ÷¼à²âÊı¾İ±í (Transformer Data)
+-- 9. å˜å‹å™¨ç›‘æµ‹æ•°æ®è¡¨ (Transformer Data)
 CREATE TABLE Data_Transformer (
     Data_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     Transformer_ID BIGINT NOT NULL,
     Collect_Time DATETIME2(0) NOT NULL,
-    Winding_Temp DECIMAL(6,2), -- ÈÆ×éÎÂ¶È
-    Core_Temp DECIMAL(6,2),    -- ÌúĞ¾ÎÂ¶È
-    Load_Rate DECIMAL(5,2),    -- ¸ºÔØÂÊ
-    Factory_ID BIGINT,         -- ÈßÓà×Ö¶ÎÓÅ»¯²éÑ¯
+    Winding_Temp DECIMAL(6,2), -- ç»•ç»„æ¸©åº¦
+    Core_Temp DECIMAL(6,2),    -- é“èŠ¯æ¸©åº¦
+    Load_Rate DECIMAL(5,2),    -- è´Ÿè½½ç‡
+    Factory_ID BIGINT,         -- å†—ä½™å­—æ®µä¼˜åŒ–æŸ¥è¯¢
 
     CONSTRAINT FK_DataTrans_Device FOREIGN KEY (Transformer_ID) REFERENCES Dist_Transformer(Transformer_ID)
 );
 
--- 10. »ØÂ·¼à²âÊı¾İ±í (Circuit Data)
+-- 10. å›è·¯ç›‘æµ‹æ•°æ®è¡¨ (Circuit Data)
 CREATE TABLE Data_Circuit (
     Data_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     Circuit_ID BIGINT NOT NULL,
@@ -183,24 +183,24 @@ CREATE TABLE Data_Circuit (
     Active_Power DECIMAL(12,3),
     Reactive_Power DECIMAL(12,3),
     Power_Factor DECIMAL(5,3),
-    Switch_Status NVARCHAR(10), -- ºÏÕ¢/·ÖÕ¢
-    Factory_ID BIGINT,         -- ÈßÓà×Ö¶ÎÓÅ»¯²éÑ¯
+    Switch_Status NVARCHAR(10), -- åˆé—¸/åˆ†é—¸
+    Factory_ID BIGINT,         -- å†—ä½™å­—æ®µä¼˜åŒ–æŸ¥è¯¢
 
     CONSTRAINT FK_DataCircuit_Device FOREIGN KEY (Circuit_ID) REFERENCES Dist_Circuit(Circuit_ID),
-    CONSTRAINT CK_Switch_Status CHECK (Switch_Status IN ('ºÏÕ¢','·ÖÕ¢'))
+    CONSTRAINT CK_Switch_Status CHECK (Switch_Status IN ('åˆé—¸','åˆ†é—¸'))
 );
 
 
 /* ============================================================
-   µÚËÄ²¿·Ö£º×ÛºÏÄÜºÄ¹ÜÀíÒµÎñÏß
+   ç¬¬å››éƒ¨åˆ†ï¼šç»¼åˆèƒ½è€—ç®¡ç†ä¸šåŠ¡çº¿
    ============================================================ */
 
--- 11. ÄÜºÄ¼ÆÁ¿Éè±¸±í (Energy Meter)
+-- 11. èƒ½è€—è®¡é‡è®¾å¤‡è¡¨ (Energy Meter)
 CREATE TABLE Energy_Meter (
     Meter_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
-    Energy_Type NVARCHAR(10) NOT NULL, -- Ë®/ÕôÆû/ÌìÈ»Æø
+    Energy_Type NVARCHAR(10) NOT NULL, -- æ°´/è’¸æ±½/å¤©ç„¶æ°”
     Comm_Protocol NVARCHAR(20),        -- RS485/Lora
-    Run_Status NVARCHAR(10) DEFAULT 'Õı³£',
+    Run_Status NVARCHAR(10) DEFAULT 'æ­£å¸¸',
     Install_Location NVARCHAR(100),
     Calib_Cycle_Months INT,
     Manufacturer NVARCHAR(50),
@@ -209,28 +209,28 @@ CREATE TABLE Energy_Meter (
 
     CONSTRAINT FK_Meter_Factory FOREIGN KEY (Factory_ID) REFERENCES Base_Factory(Factory_ID),
     CONSTRAINT FK_Meter_Ledger FOREIGN KEY (Ledger_ID) REFERENCES Device_Ledger(Ledger_ID),
-    CONSTRAINT CK_Energy_Type CHECK (Energy_Type IN ('Ë®','ÕôÆû','ÌìÈ»Æø')),
-    CONSTRAINT CK_Meter_Status CHECK (Run_Status IN ('Õı³£','¹ÊÕÏ'))
+    CONSTRAINT CK_Energy_Type CHECK (Energy_Type IN ('æ°´','è’¸æ±½','å¤©ç„¶æ°”')),
+    CONSTRAINT CK_Meter_Status CHECK (Run_Status IN ('æ­£å¸¸','æ•…éšœ'))
 );
 
--- 12. ·å¹ÈÊ±¶ÎÅäÖÃ±í (²¹³ä±í£¬ÓÃÓÚÖ§³Å¼ÆËã)
+-- 12. å³°è°·æ—¶æ®µé…ç½®è¡¨ (è¡¥å……è¡¨ï¼Œç”¨äºæ”¯æ’‘è®¡ç®—)
 CREATE TABLE Config_PeakValley (
     Config_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
-    Time_Type NVARCHAR(10) NOT NULL, -- ¼â·å/¸ß·å/Æ½¶Î/µÍ¹È
+    Time_Type NVARCHAR(10) NOT NULL, -- å°–å³°/é«˜å³°/å¹³æ®µ/ä½è°·
     Start_Time TIME(0) NOT NULL,
     End_Time TIME(0) NOT NULL,
-    Price_Rate DECIMAL(8,4) NOT NULL, -- µ¥¼Û
+    Price_Rate DECIMAL(8,4) NOT NULL, -- å•ä»·
     
-    CONSTRAINT CK_Time_Type CHECK (Time_Type IN ('¼â·å','¸ß·å','Æ½¶Î','µÍ¹È'))
+    CONSTRAINT CK_Time_Type CHECK (Time_Type IN ('å°–å³°','é«˜å³°','å¹³æ®µ','ä½è°·'))
 );
 
--- 13. ·å¹ÈÄÜºÄÊı¾İ±í (Peak Valley Data) - °´ÈÕÍ³¼Æ½á¹û
+-- 13. å³°è°·èƒ½è€—æ•°æ®è¡¨ (Peak Valley Data) - æŒ‰æ—¥ç»Ÿè®¡ç»“æœ
 CREATE TABLE Data_PeakValley (
     Record_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     Stat_Date DATE NOT NULL,
     Energy_Type NVARCHAR(10) NOT NULL,
     Factory_ID BIGINT NOT NULL,
-    Peak_Type NVARCHAR(10), -- ¼â·å/¸ß·å/Æ½¶Î/µÍ¹È
+    Peak_Type NVARCHAR(10), -- å°–å³°/é«˜å³°/å¹³æ®µ/ä½è°·
     Total_Consumption DECIMAL(12,3),
     Cost_Amount DECIMAL(12,2),
     EnergyMgr_ID BIGINT,
@@ -239,40 +239,40 @@ CREATE TABLE Data_PeakValley (
     CONSTRAINT FK_PVData_Mgr FOREIGN KEY (EnergyMgr_ID) REFERENCES Role_EnergyMgr(EnergyMgr_ID)
 );
 
--- 14. ÄÜºÄ¼à²âÊı¾İ±í (Energy Data)
+-- 14. èƒ½è€—ç›‘æµ‹æ•°æ®è¡¨ (Energy Data)
 CREATE TABLE Data_Energy (
     Data_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     Meter_ID BIGINT NOT NULL,
     Collect_Time DATETIME2(0) NOT NULL,
     Value DECIMAL(12,3) NOT NULL,
     Unit NVARCHAR(10),
-    Quality NVARCHAR(10) DEFAULT 'ÓÅ', -- ÓÅ/Á¼/ÖĞ/²î
-    Factory_ID BIGINT, -- ÈßÓàÓÅ»¯
-    PV_Record_ID BIGINT, -- ¹ØÁª·å¹È¼ÇÂ¼
+    Quality NVARCHAR(10) DEFAULT 'ä¼˜', -- ä¼˜/è‰¯/ä¸­/å·®
+    Factory_ID BIGINT, -- å†—ä½™ä¼˜åŒ–
+    PV_Record_ID BIGINT, -- å…³è”å³°è°·è®°å½•
 
     CONSTRAINT FK_DataEnergy_Meter FOREIGN KEY (Meter_ID) REFERENCES Energy_Meter(Meter_ID),
     CONSTRAINT FK_DataEnergy_PV FOREIGN KEY (PV_Record_ID) REFERENCES Data_PeakValley(Record_ID),
-    CONSTRAINT CK_Data_Quality CHECK (Quality IN ('ÓÅ','Á¼','ÖĞ','²î'))
+    CONSTRAINT CK_Data_Quality CHECK (Quality IN ('ä¼˜','è‰¯','ä¸­','å·®'))
 );
 
 
 /* ============================================================
-   µÚÎå²¿·Ö£º·Ö²¼Ê½¹â·ü¹ÜÀíÒµÎñÏß
+   ç¬¬äº”éƒ¨åˆ†ï¼šåˆ†å¸ƒå¼å…‰ä¼ç®¡ç†ä¸šåŠ¡çº¿
    ============================================================ */
 
--- 15. ²¢Íøµã±í (Grid Point)
+-- 15. å¹¶ç½‘ç‚¹è¡¨ (Grid Point)
 CREATE TABLE PV_Grid_Point (
     Point_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     Point_Name NVARCHAR(50),
     Location NVARCHAR(100)
 );
 
--- 16. ¹â·üÉè±¸±í (PV Device)
+-- 16. å…‰ä¼è®¾å¤‡è¡¨ (PV Device)
 CREATE TABLE PV_Device (
     Device_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
-    Device_Type NVARCHAR(20) NOT NULL, -- Äæ±äÆ÷/»ãÁ÷Ïä
+    Device_Type NVARCHAR(20) NOT NULL, -- é€†å˜å™¨/æ±‡æµç®±
     Capacity DECIMAL(10,2), -- kWP
-    Run_Status NVARCHAR(10) DEFAULT 'Õı³£',
+    Run_Status NVARCHAR(10) DEFAULT 'æ­£å¸¸',
     Install_Date DATE,
     Protocol NVARCHAR(20),
     Point_ID BIGINT NOT NULL,
@@ -280,25 +280,25 @@ CREATE TABLE PV_Device (
 
     CONSTRAINT FK_PV_Point FOREIGN KEY (Point_ID) REFERENCES PV_Grid_Point(Point_ID),
     CONSTRAINT FK_PV_Ledger FOREIGN KEY (Ledger_ID) REFERENCES Device_Ledger(Ledger_ID),
-    CONSTRAINT CK_PV_Type CHECK (Device_Type IN ('Äæ±äÆ÷','»ãÁ÷Ïä')),
-    CONSTRAINT CK_PV_Status CHECK (Run_Status IN ('Õı³£','¹ÊÕÏ','ÀëÏß'))
+    CONSTRAINT CK_PV_Type CHECK (Device_Type IN ('é€†å˜å™¨','æ±‡æµç®±')),
+    CONSTRAINT CK_PV_Status CHECK (Run_Status IN ('æ­£å¸¸','æ•…éšœ','ç¦»çº¿'))
 );
 
--- 17. ¹â·ü·¢µçÊı¾İ±í (PV Generation)
+-- 17. å…‰ä¼å‘ç”µæ•°æ®è¡¨ (PV Generation)
 CREATE TABLE Data_PV_Gen (
     Data_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     Device_ID BIGINT NOT NULL,
     Collect_Time DATETIME2(0) NOT NULL,
-    Gen_KWH DECIMAL(12,3), -- ·¢µçÁ¿
-    Grid_KWH DECIMAL(12,3), -- ÉÏÍøµçÁ¿
-    Self_KWH DECIMAL(12,3), -- ×ÔÓÃµçÁ¿
-    Inverter_Eff DECIMAL(5,2), -- Äæ±äÆ÷Ğ§ÂÊ
-    Factory_ID BIGINT, -- ÈßÓàÓÅ»¯
+    Gen_KWH DECIMAL(12,3), -- å‘ç”µé‡
+    Grid_KWH DECIMAL(12,3), -- ä¸Šç½‘ç”µé‡
+    Self_KWH DECIMAL(12,3), -- è‡ªç”¨ç”µé‡
+    Inverter_Eff DECIMAL(5,2), -- é€†å˜å™¨æ•ˆç‡
+    Factory_ID BIGINT, -- å†—ä½™ä¼˜åŒ–
 
     CONSTRAINT FK_PVGen_Device FOREIGN KEY (Device_ID) REFERENCES PV_Device(Device_ID)
 );
 
--- 18. ¹â·üÔ¤²âÄ£ĞÍ±í
+-- 18. å…‰ä¼é¢„æµ‹æ¨¡å‹è¡¨
 CREATE TABLE PV_Forecast_Model (
     Model_Version NVARCHAR(20) PRIMARY KEY,
     Model_Name NVARCHAR(50),
@@ -306,12 +306,12 @@ CREATE TABLE PV_Forecast_Model (
     Update_Time DATETIME2(0)
 );
 
--- 19. ¹â·üÔ¤²âÊı¾İ±í (Forecast)
+-- 19. å…‰ä¼é¢„æµ‹æ•°æ®è¡¨ (Forecast)
 CREATE TABLE Data_PV_Forecast (
     Forecast_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     Point_ID BIGINT NOT NULL,
     Forecast_Date DATE NOT NULL,
-    Time_Slot NVARCHAR(20), -- Èç '08:00-09:00'
+    Time_Slot NVARCHAR(20), -- å¦‚ '08:00-09:00'
     Forecast_Val DECIMAL(12,3),
     Actual_Val DECIMAL(12,3),
     Model_Version NVARCHAR(20),
@@ -322,13 +322,16 @@ CREATE TABLE Data_PV_Forecast (
     CONSTRAINT FK_Forecast_Analyst FOREIGN KEY (Analyst_ID) REFERENCES Role_Analyst(Analyst_ID)
 );
 
--- 20. Ä£ĞÍÓÅ»¯ÌáĞÑ±í (Optimization Alert)
+    Verify_Status NVARCHAR(10) DEFAULT N'',
+    Verify_Remark NVARCHAR(200),
+    ,CONSTRAINT CK_Alarm_Verify CHECK (Verify_Status IN (N'', N'Ğ§', N''))
+-- 20. æ¨¡å‹ä¼˜åŒ–æé†’è¡¨ (Optimization Alert)
 CREATE TABLE PV_Model_Alert (
     Alert_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     Point_ID BIGINT NOT NULL,
     Trigger_Time DATETIME2(0),
     Remark NVARCHAR(200),
-    Process_Status NVARCHAR(10) DEFAULT 'Î´´¦Àí',
+    Process_Status NVARCHAR(10) DEFAULT 'æœªå¤„ç†',
     Model_Version NVARCHAR(20),
 
     CONSTRAINT FK_Alert_Point FOREIGN KEY (Point_ID) REFERENCES PV_Grid_Point(Point_ID)
@@ -336,51 +339,51 @@ CREATE TABLE PV_Model_Alert (
 
 
 /* ============================================================
-   µÚÁù²¿·Ö£º¸æ¾¯ÔËÎ¬¹ÜÀíÒµÎñÏß
+   ç¬¬å…­éƒ¨åˆ†ï¼šå‘Šè­¦è¿ç»´ç®¡ç†ä¸šåŠ¡çº¿
    ============================================================ */
 
--- 21. ¸æ¾¯»ù±¾ĞÅÏ¢±í (Alarm Info)
+-- 21. å‘Šè­¦åŸºæœ¬ä¿¡æ¯è¡¨ (Alarm Info)
 CREATE TABLE Alarm_Info (
     Alarm_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
-    Alarm_Type NVARCHAR(20) NOT NULL, -- Ô½ÏŞ¸æ¾¯/Í¨Ñ¶¹ÊÕÏ/Éè±¸¹ÊÕÏ
-    Alarm_Level NVARCHAR(10) NOT NULL, -- ¸ß/ÖĞ/µÍ
+    Alarm_Type NVARCHAR(20) NOT NULL, -- è¶Šé™å‘Šè­¦/é€šè®¯æ•…éšœ/è®¾å¤‡æ•…éšœ
+    Alarm_Level NVARCHAR(10) NOT NULL, -- é«˜/ä¸­/ä½
     Content NVARCHAR(200),
     Occur_Time DATETIME2(0) NOT NULL,
-    Process_Status NVARCHAR(10) DEFAULT 'Î´´¦Àí',
-    Ledger_ID BIGINT NULL, -- ¹ØÁªÉè±¸Ì¨ÕË
-    Factory_ID BIGINT,     -- ÈßÓàÓÅ»¯£¬±ãÓÚ´óÆÁ²éÑ¯
+    Process_Status NVARCHAR(10) DEFAULT 'æœªå¤„ç†',
+    Ledger_ID BIGINT NULL, -- å…³è”è®¾å¤‡å°è´¦
+    Factory_ID BIGINT,     -- å†—ä½™ä¼˜åŒ–ï¼Œä¾¿äºå¤§å±æŸ¥è¯¢
 
     CONSTRAINT FK_Alarm_Ledger FOREIGN KEY (Ledger_ID) REFERENCES Device_Ledger(Ledger_ID),
-    CONSTRAINT CK_Alarm_Level CHECK (Alarm_Level IN ('¸ß','ÖĞ','µÍ')),
-    CONSTRAINT CK_Alarm_Status CHECK (Process_Status IN ('Î´´¦Àí','´¦ÀíÖĞ','ÒÑ½á°¸'))
+    CONSTRAINT CK_Alarm_Level CHECK (Alarm_Level IN ('é«˜','ä¸­','ä½')),
+    CONSTRAINT CK_Alarm_Status CHECK (Process_Status IN ('æœªå¤„ç†','å¤„ç†ä¸­','å·²ç»“æ¡ˆ'))
 );
 
--- 22. ÔËÎ¬¹¤µ¥Êı¾İ±í (Work Order)
+-- 22. è¿ç»´å·¥å•æ•°æ®è¡¨ (Work Order)
 CREATE TABLE Work_Order (
     Order_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     Alarm_ID BIGINT NOT NULL,
-    OandM_ID BIGINT NOT NULL, -- ÔËÎ¬ÈËÔ±
-    Dispatcher_ID BIGINT NOT NULL, --ÔËÎ¬¹¤µ¥¹ÜÀíÔ±
-    Ledger_ID BIGINT,         -- Î¬ĞŞÉè±¸
+    OandM_ID BIGINT NOT NULL, -- è¿ç»´äººå‘˜
+    Dispatcher_ID BIGINT NOT NULL, --è¿ç»´å·¥å•ç®¡ç†å‘˜
+    Ledger_ID BIGINT,         -- ç»´ä¿®è®¾å¤‡
     Dispatch_Time DATETIME2(0),
     Response_Time DATETIME2(0),
     Finish_Time DATETIME2(0),
     Result_Desc NVARCHAR(200),
-    Review_Status NVARCHAR(10), -- Í¨¹ı/Î´Í¨¹ı
+    Review_Status NVARCHAR(10), -- é€šè¿‡/æœªé€šè¿‡
 
     CONSTRAINT FK_Order_Alarm FOREIGN KEY (Alarm_ID) REFERENCES Alarm_Info(Alarm_ID),
     CONSTRAINT FK_Order_OandM FOREIGN KEY (OandM_ID) REFERENCES Role_OandM(OandM_ID),
     CONSTRAINT FK_Order_Ledger FOREIGN KEY (Ledger_ID) REFERENCES Device_Ledger(Ledger_ID)
 );
 
--- 23. ¸æ¾¯´¦ÀíĞÅÏ¢ (Alarm Handling Log - ¹ı³Ì¼ÇÂ¼)
+-- 23. å‘Šè­¦å¤„ç†ä¿¡æ¯ (Alarm Handling Log - è¿‡ç¨‹è®°å½•)
 CREATE TABLE Alarm_Handling_Log (
     Log_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     Alarm_ID BIGINT NOT NULL,
     Handle_Time DATETIME2(0) DEFAULT SYSDATETIME(),
     Status_After NVARCHAR(10),
-    OandM_ID BIGINT,      -- ´¦ÀíÈË
-    Dispatcher_ID BIGINT, -- µ÷¶ÈÈË
+    OandM_ID BIGINT,      -- å¤„ç†äºº
+    Dispatcher_ID BIGINT, -- è°ƒåº¦äºº
     
     CONSTRAINT FK_Log_Alarm FOREIGN KEY (Alarm_ID) REFERENCES Alarm_Info(Alarm_ID),
     CONSTRAINT FK_Log_OandM FOREIGN KEY (OandM_ID) REFERENCES Role_OandM(OandM_ID),
@@ -389,22 +392,22 @@ CREATE TABLE Alarm_Handling_Log (
 
 
 /* ============================================================
-   µÚÆß²¿·Ö£º´óÆÁÊı¾İÕ¹Ê¾ÓëÍ³¼Æ
+   ç¬¬ä¸ƒéƒ¨åˆ†ï¼šå¤§å±æ•°æ®å±•ç¤ºä¸ç»Ÿè®¡
    ============================================================ */
 
--- 24. ´óÆÁÕ¹Ê¾ÅäÖÃ±í (Dashboard Config)
+-- 24. å¤§å±å±•ç¤ºé…ç½®è¡¨ (Dashboard Config)
 CREATE TABLE Dashboard_Config (
     Config_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
-    Module_Name NVARCHAR(20), -- ÄÜÔ´×ÜÀÀ/¹â·ü×ÜÀÀµÈ
+    Module_Name NVARCHAR(20), -- èƒ½æºæ€»è§ˆ/å…‰ä¼æ€»è§ˆç­‰
     Refresh_Rate NVARCHAR(20),
     Sort_Rule NVARCHAR(50),
     Display_Fields NVARCHAR(500), -- JSON or CSV
-    Auth_Level NVARCHAR(20) -- ¹ÜÀíÔ±/ÔËÎ¬ÈËÔ±
+    Auth_Level NVARCHAR(20) -- ç®¡ç†å‘˜/è¿ç»´äººå‘˜
 );
 
--- 25. ÊµÊ±»ã×ÜÊı¾İ±í (Realtime Summary)
+-- 25. å®æ—¶æ±‡æ€»æ•°æ®è¡¨ (Realtime Summary)
 CREATE TABLE Stat_Realtime (
-    Summary_ID NVARCHAR(20) PRIMARY KEY, -- ½¨ÒéÊ¹ÓÃÊ±¼ä´Á×Ö·û´®»òGUID
+    Summary_ID NVARCHAR(20) PRIMARY KEY, -- å»ºè®®ä½¿ç”¨æ—¶é—´æˆ³å­—ç¬¦ä¸²æˆ–GUID
     Stat_Time DATETIME2(0) NOT NULL,
     Total_KWH DECIMAL(12,3),
     Total_Alarm INT,
@@ -416,15 +419,15 @@ CREATE TABLE Stat_Realtime (
     CONSTRAINT FK_Realtime_Manager FOREIGN KEY (Manager_ID) REFERENCES Role_Manager(Manager_ID)
 );
 
--- 26. ÀúÊ·Ç÷ÊÆÊı¾İ±í (History Trend)
+-- 26. å†å²è¶‹åŠ¿æ•°æ®è¡¨ (History Trend)
 CREATE TABLE Stat_History_Trend (
     Trend_ID NVARCHAR(20) PRIMARY KEY,
     Energy_Type NVARCHAR(10),
-    Stat_Cycle NVARCHAR(10), -- ÈÕ/ÖÜ/ÔÂ
+    Stat_Cycle NVARCHAR(10), -- æ—¥/å‘¨/æœˆ
     Stat_Date DATE,
     Value DECIMAL(12,3),
-    YOY_Rate DECIMAL(5,2), -- Í¬±È
-    MOM_Rate DECIMAL(5,2), -- »·±È
+    YOY_Rate DECIMAL(5,2), -- åŒæ¯”
+    MOM_Rate DECIMAL(5,2), -- ç¯æ¯”
     Config_ID BIGINT,
     Analyst_ID BIGINT,
 
@@ -433,48 +436,48 @@ CREATE TABLE Stat_History_Trend (
 );
 
 /* ============================================================
-   µÚ°Ë²¿·Ö£º¸ßĞÔÄÜË÷ÒıÓÅ»¯ (Index Creation)
+   ç¬¬å…«éƒ¨åˆ†ï¼šé«˜æ€§èƒ½ç´¢å¼•ä¼˜åŒ– (Index Creation)
    ============================================================ */
 GO
 
--- 1. »ØÂ·¼à²âÊı¾İ£ºÀúÊ·Ç÷ÊÆ²éÑ¯ÓÅ»¯
+-- 1. å›è·¯ç›‘æµ‹æ•°æ®ï¼šå†å²è¶‹åŠ¿æŸ¥è¯¢ä¼˜åŒ–
 CREATE NONCLUSTERED INDEX IDX_Circuit_History 
 ON Data_Circuit (Circuit_ID, Collect_Time);
 
--- 2. »ØÂ·¼à²âÊı¾İ£º³§ÇøÊµÊ±×´Ì¬²éÑ¯ÓÅ»¯ (ÀûÓÃÈßÓà³§ÇøID)
+-- 2. å›è·¯ç›‘æµ‹æ•°æ®ï¼šå‚åŒºå®æ—¶çŠ¶æ€æŸ¥è¯¢ä¼˜åŒ– (åˆ©ç”¨å†—ä½™å‚åŒºID)
 CREATE NONCLUSTERED INDEX IDX_Circuit_Factory_RT 
 ON Data_Circuit (Factory_ID, Collect_Time DESC);
 
--- 3. ¸æ¾¯ĞÅÏ¢£º¶àÎ¬¹ıÂË (´óÆÁÕ¹Ê¾ºËĞÄ)
+-- 3. å‘Šè­¦ä¿¡æ¯ï¼šå¤šç»´è¿‡æ»¤ (å¤§å±å±•ç¤ºæ ¸å¿ƒ)
 CREATE NONCLUSTERED INDEX IDX_Alarm_Dashboard 
 ON Alarm_Info (Process_Status, Alarm_Level, Occur_Time)
-INCLUDE (Factory_ID); -- °üº¬ÁĞÓÅ»¯²éÑ¯
+INCLUDE (Factory_ID); -- åŒ…å«åˆ—ä¼˜åŒ–æŸ¥è¯¢
 
--- 4. ·å¹ÈÄÜºÄ£º±¨±íÍ³¼ÆÓÅ»¯
+-- 4. å³°è°·èƒ½è€—ï¼šæŠ¥è¡¨ç»Ÿè®¡ä¼˜åŒ–
 CREATE NONCLUSTERED INDEX IDX_PeakValley_Rpt 
 ON Data_PeakValley (Stat_Date, Energy_Type, Factory_ID);
 
--- 5. ¹â·üÔ¤²â£º¾«×¼Æ¥Åä
+-- 5. å…‰ä¼é¢„æµ‹ï¼šç²¾å‡†åŒ¹é…
 CREATE NONCLUSTERED INDEX IDX_PV_Forecast_Match 
 ON Data_PV_Forecast (Point_ID, Forecast_Date, Time_Slot);
 
--- 6. ÏµÍ³ÈËÔ±£ºµÇÂ¼¼ÓËÙ
+-- 6. ç³»ç»Ÿäººå‘˜ï¼šç™»å½•åŠ é€Ÿ
 CREATE UNIQUE NONCLUSTERED INDEX IDX_SysUser_Login 
 ON Sys_User (Login_Account);
 
--- 7. ±äÑ¹Æ÷Êı¾İ£ºÊ±¼äĞòÁĞ²éÑ¯
+-- 7. å˜å‹å™¨æ•°æ®ï¼šæ—¶é—´åºåˆ—æŸ¥è¯¢
 CREATE NONCLUSTERED INDEX IDX_Trans_Time 
 ON Data_Transformer (Transformer_ID, Collect_Time);
 
 GO
 
 /* ============================================================
-   µÚ¾Å²¿·Ö£ººËĞÄÒµÎñÊÓÍ¼ (View Definitions)
+   ç¬¬ä¹éƒ¨åˆ†ï¼šæ ¸å¿ƒä¸šåŠ¡è§†å›¾ (View Definitions)
    ============================================================ */
 GO
 
--- ÊÓÍ¼ 1: ³§Çø»ØÂ·Òì³£Êı¾İÊÓÍ¼ (¸¨ÖúÅäµçÍø¼à²â)
--- ×÷ÓÃ£º¿ìËÙÉ¸Ñ¡³öµçÑ¹»òµçÁ÷Òì³£µÄ¼ÇÂ¼
+-- è§†å›¾ 1: å‚åŒºå›è·¯å¼‚å¸¸æ•°æ®è§†å›¾ (è¾…åŠ©é…ç”µç½‘ç›‘æµ‹)
+-- ä½œç”¨ï¼šå¿«é€Ÿç­›é€‰å‡ºç”µå‹æˆ–ç”µæµå¼‚å¸¸çš„è®°å½•
 CREATE VIEW View_Circuit_Abnormal AS
 SELECT 
     d.Data_ID,
@@ -489,12 +492,12 @@ FROM Data_Circuit d
 JOIN Dist_Circuit c ON d.Circuit_ID = c.Circuit_ID
 JOIN Dist_Room r ON c.Room_ID = r.Room_ID
 JOIN Base_Factory f ON r.Factory_ID = f.Factory_ID
-WHERE d.Voltage > 37 -- ¼ÙÉè35kV³¬ÏŞ (Ê¾ÀıãĞÖµ)
+WHERE d.Voltage > 37 -- å‡è®¾35kVè¶…é™ (ç¤ºä¾‹é˜ˆå€¼)
    OR d.Voltage < 33;
 GO
 
--- ÊÓÍ¼ 2: ³§ÇøÈÕÄÜºÄ³É±¾Í³¼ÆÊÓÍ¼ (¸¨Öú×ÛºÏÄÜºÄ)
--- ×÷ÓÃ£º¾ÛºÏ¼ÆËã¸÷³§ÇøÃ¿ÈÕµÄ×ÜÄÜºÄ³É±¾
+-- è§†å›¾ 2: å‚åŒºæ—¥èƒ½è€—æˆæœ¬ç»Ÿè®¡è§†å›¾ (è¾…åŠ©ç»¼åˆèƒ½è€—)
+-- ä½œç”¨ï¼šèšåˆè®¡ç®—å„å‚åŒºæ¯æ—¥çš„æ€»èƒ½è€—æˆæœ¬
 CREATE VIEW View_Daily_Energy_Cost AS
 SELECT 
     p.Stat_Date,
@@ -507,8 +510,42 @@ JOIN Base_Factory f ON p.Factory_ID = f.Factory_ID
 GROUP BY p.Stat_Date, f.Factory_Name, p.Energy_Type;
 GO
 
--- ÊÓÍ¼ 3: ´ı´¦Àí¸ßµÈ¼¶¸æ¾¯ÊÓÍ¼ (¸¨Öú´óÆÁÕ¹Ê¾)
--- ×÷ÓÃ£º´óÆÁÖ±½Ó²éÑ¯´ËÊÓÍ¼»ñÈ¡ºìÉ«¸æ¾¯
+PRINT 'Database SQL_BFU initialized successfully with all tables, constraints, indexes and views.';
+
+/* ============================================================
+   ä¼ä¸šç®¡ç†å±‚ï¼šé‡å¤§å†³ç­–ä¸ç§‘ç ”é¡¹ç›®
+   ============================================================ */
+
+-- 27. ç®¡ç†å±‚é‡å¤§äº‹é¡¹å†³ç­–è¡¨ (Executive Decision Items)
+CREATE TABLE Exec_Decision_Item (
+    Decision_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
+    Decision_Type NVARCHAR(20) NOT NULL, -- ç»´ä¿®/æ”¹é€ 
+    Title NVARCHAR(100) NOT NULL,
+    Description NVARCHAR(200),
+    Status NVARCHAR(20) DEFAULT 'å¾…å†³ç­–',
+    Alarm_ID BIGINT NULL,
+    Estimate_Cost DECIMAL(12,2),
+    Expected_Saving DECIMAL(12,2),
+    Created_Time DATETIME2(0) DEFAULT SYSDATETIME(),
+
+    CONSTRAINT FK_Decision_Alarm FOREIGN KEY (Alarm_ID) REFERENCES Alarm_Info(Alarm_ID)
+);
+GO
+
+-- 28. ç§‘ç ”é¡¹ç›®è¡¨ (Research Project)
+CREATE TABLE Research_Project (
+    Project_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
+    Project_Title NVARCHAR(100) NOT NULL,
+    Project_Summary NVARCHAR(500),
+    Applicant NVARCHAR(50),
+    Apply_Date DATETIME2(0) DEFAULT SYSDATETIME(),
+    Project_Status NVARCHAR(20) DEFAULT 'ç”³æŠ¥ä¸­',
+    Close_Report NVARCHAR(500),
+    Close_Date DATETIME2(0)
+);
+GO
+-- è§†å›¾ 3: å¾…å¤„ç†é«˜ç­‰çº§å‘Šè­¦è§†å›¾ (è¾…åŠ©å¤§å±å±•ç¤º)
+-- ä½œç”¨ï¼šå¤§å±ç›´æ¥æŸ¥è¯¢æ­¤è§†å›¾è·å–çº¢è‰²å‘Šè­¦
 CREATE VIEW View_Pending_High_Alarms AS
 SELECT 
     a.Alarm_ID,
@@ -520,8 +557,8 @@ SELECT
 FROM Alarm_Info a
 LEFT JOIN Base_Factory f ON a.Factory_ID = f.Factory_ID
 LEFT JOIN Device_Ledger l ON a.Ledger_ID = l.Ledger_ID
-WHERE a.Process_Status = 'Î´´¦Àí' 
-  AND a.Alarm_Level = '¸ß';
+WHERE a.Process_Status = 'æœªå¤„ç†' 
+  AND a.Alarm_Level = 'é«˜';
 GO
 
 PRINT 'Database SQL_BFU initialized successfully with all tables, constraints, indexes and views.';
