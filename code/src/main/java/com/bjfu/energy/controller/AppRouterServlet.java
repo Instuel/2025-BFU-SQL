@@ -40,8 +40,8 @@ public class AppRouterServlet extends HttpServlet {
                 jsp = "/WEB-INF/jsp/alarm/alarm_list.jsp";
                 break;
             case "admin":
-                jsp = "/WEB-INF/jsp/admin/user_list.jsp";
-                break;
+                resp.sendRedirect(req.getContextPath() + "/admin?action=list");
+                return;
             default:
                 jsp = "/WEB-INF/jsp/dashboard/dashboard.jsp";
                 break;

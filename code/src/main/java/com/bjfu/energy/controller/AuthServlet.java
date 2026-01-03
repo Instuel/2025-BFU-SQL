@@ -1,11 +1,16 @@
 package com.bjfu.energy.controller;
 
 import com.bjfu.energy.entity.SysUser;
+import com.bjfu.energy.entity.SysPermission;
 import com.bjfu.energy.service.AuthService;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.*;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * 处理登录 / 登出 / 注册：
@@ -67,6 +72,13 @@ public class AuthServlet extends HttpServlet {
         String loginAccount = req.getParameter("loginAccount");
         String loginPassword = req.getParameter("loginPassword");
 
+        if (loginAccount == null || loginAccount.trim().isEmpty()
+                || loginPassword == null || loginPassword.trim().isEmpty()) {
+            req.setAttribute("error", "请输入账号和密码。");
+            req.getRequestDispatcher("/WEB-INF/jsp/auth/login.jsp").forward(req, resp);
+            return;
+        }
+
         try {
             SysUser user = authService.login(loginAccount, loginPassword);
             if (user == null) {
@@ -83,6 +95,25 @@ public class AuthServlet extends HttpServlet {
                 roleType = "GUEST";
             }
             session.setAttribute("currentRoleType", roleType);
+
+            List<SysPermission> permissions = authService.getPermissions(user.getUserId());
+            Set<String> permCodes = new HashSet<>();
+            Set<String> permModules = new HashSet<>();
+            List<String> permUris = new ArrayList<>();
+            for (SysPermission p : permissions) {
+                if (p.getPermCode() != null) {
+                    permCodes.add(p.getPermCode());
+                }
+                if (p.getModule() != null) {
+                    permModules.add(p.getModule());
+                }
+                if (p.getUriPattern() != null) {
+                    permUris.add(p.getUriPattern());
+                }
+            }
+            session.setAttribute("currentPermCodes", permCodes);
+            session.setAttribute("currentPermModules", permModules);
+            session.setAttribute("currentPermUris", permUris);
 
             resp.sendRedirect(req.getContextPath() + "/app?module=dashboard");
         } catch (Exception e) {
@@ -104,7 +135,8 @@ public class AuthServlet extends HttpServlet {
             authService.register(u, rawPassword);
             resp.sendRedirect(req.getContextPath() + "/auth?action=loginPage");
         } catch (Exception e) {
-            throw new ServletException("注册失败: " + e.getMessage(), e);
+            req.setAttribute("error", e.getMessage());
+            req.getRequestDispatcher("/WEB-INF/jsp/auth/register.jsp").forward(req, resp);
         }
     }
 }

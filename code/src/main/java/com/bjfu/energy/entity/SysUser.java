@@ -20,6 +20,10 @@ public class SysUser implements Serializable {
     private String contactPhone;
     private Integer accountStatus; // 1=启用,0=禁用
     private LocalDateTime createdTime;
+    private LocalDateTime updatedTime;
+    private LocalDateTime lastLoginTime;
+    private Long createdBy;
+    private Long updatedBy;
 
     public Long getUserId() {
         return userId;
@@ -91,5 +95,37 @@ public class SysUser implements Serializable {
 
     public void setCreatedTime(LocalDateTime createdTime) {
         this.createdTime = createdTime;
+    }
+
+    public LocalDateTime getUpdatedTime() {
+        return updatedTime;
+    }
+
+    public void setUpdatedTime(LocalDateTime updatedTime) {
+        this.updatedTime = updatedTime;
+    }
+
+    public LocalDateTime getLastLoginTime() {
+        return lastLoginTime;
+    }
+
+    public void setLastLoginTime(LocalDateTime lastLoginTime) {
+        this.lastLoginTime = lastLoginTime;
+    }
+
+    public Long getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(Long createdBy) {
+        this.createdBy = createdBy;
+    }
+
+    public Long getUpdatedBy() {
+        return updatedBy;
+    }
+
+    public void setUpdatedBy(Long updatedBy) {
+        this.updatedBy = updatedBy;
     }
 }

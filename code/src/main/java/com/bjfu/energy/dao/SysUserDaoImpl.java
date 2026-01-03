@@ -31,13 +31,34 @@ public class SysUserDaoImpl implements SysUserDao {
         if (ts != null) {
             u.setCreatedTime(ts.toLocalDateTime());
         }
+        Timestamp updated = rs.getTimestamp("Updated_Time");
+        if (updated != null) {
+            u.setUpdatedTime(updated.toLocalDateTime());
+        }
+        Timestamp lastLogin = rs.getTimestamp("Last_Login_Time");
+        if (lastLogin != null) {
+            u.setLastLoginTime(lastLogin.toLocalDateTime());
+        }
+        long createdBy = rs.getLong("Created_By");
+        if (rs.wasNull()) {
+            u.setCreatedBy(null);
+        } else {
+            u.setCreatedBy(createdBy);
+        }
+        long updatedBy = rs.getLong("Updated_By");
+        if (rs.wasNull()) {
+            u.setUpdatedBy(null);
+        } else {
+            u.setUpdatedBy(updatedBy);
+        }
         return u;
     }
 
     @Override
     public SysUser findByLoginAccount(String loginAccount) throws Exception {
         String sql = "SELECT TOP 1 User_ID, Login_Account, Login_Password, Salt, Real_Name, " +
-                     "Department, Contact_Phone, Account_Status, Created_Time " +
+                     "Department, Contact_Phone, Account_Status, Created_Time, Updated_Time, " +
+                     "Last_Login_Time, Created_By, Updated_By " +
                      "FROM Sys_User WHERE Login_Account = ?";
         try (Connection conn = DBUtil.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -81,6 +102,17 @@ public class SysUserDaoImpl implements SysUserDao {
             }
         }
         return null;
+    }
+
+    @Override
+    public void updateLastLogin(Long userId) throws Exception {
+        String sql = "UPDATE Sys_User SET Last_Login_Time = SYSDATETIME(), " +
+                     "Updated_Time = SYSDATETIME() WHERE User_ID = ?";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, userId);
+            ps.executeUpdate();
+        }
     }
 
     @Override

@@ -6,6 +6,7 @@ import com.bjfu.energy.entity.SysUser;
 public interface SysUserDao {
     SysUser findByLoginAccount(String loginAccount) throws Exception;
     Long insert(SysUser user) throws Exception;
+    void updateLastLogin(Long userId) throws Exception;
 
     void increaseFailedLogin(Long userId) throws Exception;
     void resetFailedLogin(Long userId) throws Exception;

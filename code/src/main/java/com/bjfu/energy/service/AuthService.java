@@ -1,9 +1,14 @@
 package com.bjfu.energy.service;
 
+import com.bjfu.energy.dao.PermissionDao;
+import com.bjfu.energy.dao.PermissionDaoImpl;
 import com.bjfu.energy.dao.SysUserDao;
 import com.bjfu.energy.dao.SysUserDaoImpl;
 import com.bjfu.energy.entity.SysUser;
+import com.bjfu.energy.entity.SysPermission;
 import com.bjfu.energy.util.PasswordUtil;
+
+import java.util.List;
 
 /**
  * 登录 / 注册服务：
@@ -13,6 +18,7 @@ import com.bjfu.energy.util.PasswordUtil;
 public class AuthService {
 
     private final SysUserDao userDao = new SysUserDaoImpl();
+    private final PermissionDao permissionDao = new PermissionDaoImpl();
 
     /**
      * 登录校验
@@ -21,7 +27,8 @@ public class AuthService {
      * @return 成功则返回用户实体，失败返回 null
      */
     public SysUser login(String loginAccount, String rawPassword) throws Exception {
-        if (loginAccount == null || loginAccount.trim().isEmpty()) {
+        if (loginAccount == null || loginAccount.trim().isEmpty()
+                || rawPassword == null || rawPassword.trim().isEmpty()) {
             return null;
         }
         SysUser user = userDao.findByLoginAccount(loginAccount.trim());
@@ -44,7 +51,7 @@ public class AuthService {
             return null;
         }
 
-        // 如需记录最近登录时间，可在此调用 DAO 更新（当前数据库脚本未提供对应字段，暂略）
+        userDao.updateLastLogin(user.getUserId());
         return user;
     }
 
@@ -54,8 +61,21 @@ public class AuthService {
      * @param rawPassword 明文密码
      */
     public Long register(SysUser u, String rawPassword) throws Exception {
-        // 简化：固定 salt（真实项目应使用随机盐）
-        String salt = "VGVzdFNhbHQxMjM0NTY3OA==";
+        if (u == null) {
+            throw new IllegalArgumentException("用户信息不能为空");
+        }
+        String loginAccount = u.getLoginAccount();
+        if (loginAccount == null || loginAccount.trim().isEmpty()) {
+            throw new IllegalArgumentException("账号不能为空");
+        }
+        if (rawPassword == null || rawPassword.trim().isEmpty()) {
+            throw new IllegalArgumentException("密码不能为空");
+        }
+        if (userDao.findByLoginAccount(loginAccount.trim()) != null) {
+            throw new IllegalStateException("该账号已存在，请更换账号");
+        }
+
+        String salt = PasswordUtil.generateSalt();
         u.setSalt(salt);
         u.setLoginPassword(PasswordUtil.sha256Hex(rawPassword, salt));
         u.setAccountStatus(1);
@@ -67,5 +87,9 @@ public class AuthService {
      */
     public String getRoleType(Long userId) throws Exception {
         return userDao.getRoleTypeByUserId(userId);
+    }
+
+    public List<SysPermission> getPermissions(Long userId) throws Exception {
+        return permissionDao.findByUserId(userId);
     }
 }

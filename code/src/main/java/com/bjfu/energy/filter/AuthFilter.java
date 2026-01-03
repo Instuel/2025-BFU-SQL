@@ -1,12 +1,18 @@
 package com.bjfu.energy.filter;
 
+import com.bjfu.energy.entity.SysPermission;
 import com.bjfu.energy.entity.SysUser;
+import com.bjfu.energy.service.AuthService;
 
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * 登录鉴权过滤器（简化版 RBAC）：
@@ -18,6 +24,8 @@ import java.io.IOException;
  * 如果这里不放行 /css，则浏览器请求 CSS 会被重定向到登录页，导致页面“像没样式”。
  */
 public class AuthFilter implements Filter {
+
+    private final AuthService authService = new AuthService();
 
     @Override
     public void doFilter(ServletRequest req, ServletResponse resp, FilterChain chain)
@@ -53,8 +61,76 @@ public class AuthFilter implements Filter {
             return;
         }
 
-        // 如需细粒度权限控制，可在此处根据 session 中的 currentRoleType + URI 做判断
+        if (session != null && session.getAttribute("currentPermUris") == null) {
+            try {
+                List<SysPermission> permissions = authService.getPermissions(loginUser.getUserId());
+                Set<String> permCodes = new HashSet<>();
+                Set<String> permModules = new HashSet<>();
+                List<String> permUris = new ArrayList<>();
+                for (SysPermission p : permissions) {
+                    if (p.getPermCode() != null) {
+                        permCodes.add(p.getPermCode());
+                    }
+                    if (p.getModule() != null) {
+                        permModules.add(p.getModule());
+                    }
+                    if (p.getUriPattern() != null) {
+                        permUris.add(p.getUriPattern());
+                    }
+                }
+                session.setAttribute("currentPermCodes", permCodes);
+                session.setAttribute("currentPermModules", permModules);
+                session.setAttribute("currentPermUris", permUris);
+            } catch (Exception e) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                return;
+            }
+        }
+
+        Set<String> permModules = (session == null) ? null : (Set<String>) session.getAttribute("currentPermModules");
+        List<String> permUris = (session == null) ? null : (List<String>) session.getAttribute("currentPermUris");
+
+        if (uri.startsWith(ctx + "/app")) {
+            String module = request.getParameter("module");
+            if (module == null || module.trim().isEmpty()) {
+                module = "dashboard";
+            }
+            if (permModules == null || !permModules.contains(module)) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                return;
+            }
+            chain.doFilter(req, resp);
+            return;
+        }
+
+        if (!isUriPermitted(uri, ctx, permUris)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+            return;
+        }
+
         chain.doFilter(req, resp);
+    }
+
+    private boolean isUriPermitted(String uri, String ctx, List<String> permUris) {
+        if (permUris == null) {
+            return false;
+        }
+        for (String pattern : permUris) {
+            if (pattern == null || pattern.trim().isEmpty()) {
+                continue;
+            }
+            String normalized = pattern.trim();
+            String target = normalized.startsWith("/") ? ctx + normalized : ctx + "/" + normalized;
+            if (normalized.endsWith("*")) {
+                String prefix = target.substring(0, target.length() - 1);
+                if (uri.startsWith(prefix)) {
+                    return true;
+                }
+            } else if (uri.equals(target)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

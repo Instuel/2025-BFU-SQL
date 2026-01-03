@@ -2,6 +2,8 @@ package com.bjfu.energy.util;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.util.Base64;
 
 /**
  * 密码工具：
@@ -23,5 +25,11 @@ public final class PasswordUtil {
         } catch (Exception e) {
             throw new RuntimeException("SHA-256 计算失败", e);
         }
+    }
+
+    public static String generateSalt() {
+        byte[] bytes = new byte[16];
+        new SecureRandom().nextBytes(bytes);
+        return Base64.getEncoder().encodeToString(bytes);
     }
 }
