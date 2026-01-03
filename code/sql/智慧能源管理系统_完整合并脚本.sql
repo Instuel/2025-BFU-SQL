@@ -1349,7 +1349,7 @@ BEGIN
         CHECK (Verify_Status IN (N'待复核', N'通过', N'未通过') OR Verify_Status IS NULL);
 END
 GO
-
+/* ============================================================
 告警运维管理业务线补充
 负责人：李振梁
 
@@ -1632,22 +1632,15 @@ GO
 PRINT '正在生成变更汇总报告...';
 GO
 
-SELECT 
-    '01-大屏数据展示' AS [业务线], 
-    '杨尧天' AS [负责人], 
-    'Dashboard_Config, Stat_Realtime, Stat_History_Trend' AS [涉及对象], 
-    '创建/补全表结构; 增加v4扩展字段(Config_Code等); 增加索引' AS [变更摘要]
-UNION ALL
-SELECT 
-    '02-综合能耗管理', 
-    '杨昊田', 
-    'Energy_Meter', 
+USE SQL_BFU;
 GO
 
 /* ============================================================
-   管理层决策与科研项目扩展
+   第一部分：执行 DDL/DML 操作 (建表、插数、加约束)
+   注意：这部分必须在生成报告之前执行完毕
    ============================================================ */
 
+-- 1. 创建 Exec_Decision_Item 表
 IF OBJECT_ID('dbo.Exec_Decision_Item', 'U') IS NULL
 BEGIN
     EXEC(N'
@@ -1663,7 +1656,12 @@ BEGIN
             Created_Time DATETIME2(0) NULL,
 
             CONSTRAINT FK_Decision_Alarm FOREIGN KEY (Alarm_ID) REFERENCES Alarm_Info(Alarm_ID)
--- Maintenance plan table for O&M
+        );
+    ');
+END
+GO
+
+-- 2. 创建 Maintenance_Plan 表
 IF OBJECT_ID('dbo.Maintenance_Plan', 'U') IS NULL
 BEGIN
     EXEC(N'
@@ -1679,7 +1677,9 @@ BEGIN
         );
     ');
 END;
+GO
 
+-- 3. 创建 Research_Project 表
 IF OBJECT_ID('dbo.Research_Project', 'U') IS NULL
 BEGIN
     EXEC(N'
@@ -1695,7 +1695,9 @@ BEGIN
         );
     ');
 END;
+GO
 
+-- 4. 插入测试数据
 IF NOT EXISTS (SELECT 1 FROM dbo.Exec_Decision_Item)
 BEGIN
     INSERT INTO dbo.Exec_Decision_Item (Decision_Type, Title, Description, Status, Estimate_Cost, Expected_Saving, Created_Time)
@@ -1711,14 +1713,36 @@ BEGIN
     (N'光伏智能预测项目', N'提升光伏预测精度，支撑自用电收益提升。', N'管理层', SYSDATETIME(), N'申报中'),
     (N'能耗优化示范项目', N'围绕高耗能设备开展节能改造示范。', N'管理层', SYSDATETIME(), N'结题中');
 END;
+GO
 
+-- 5. 补全外键约束
 IF COL_LENGTH('dbo.Maintenance_Plan','Ledger_ID') IS NOT NULL
    AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name='FK_Maintenance_Plan_Ledger' AND parent_object_id=OBJECT_ID('dbo.Maintenance_Plan'))
 BEGIN
     EXEC(N'ALTER TABLE dbo.Maintenance_Plan WITH NOCHECK
-          ADD CONSTRAINT FK_Maintenance_Plan_Ledger FOREIGN KEY (Ledger_ID) REFERENCES dbo.Device_Ledger(Ledger_ID);');
+           ADD CONSTRAINT FK_Maintenance_Plan_Ledger FOREIGN KEY (Ledger_ID) REFERENCES dbo.Device_Ledger(Ledger_ID);');
 END;
 GO
+
+
+/* ============================================================
+   第二部分：生成变更汇总报告 (纯查询)
+   注意：这里是纯粹的 SELECT ... UNION ALL ... SELECT 结构
+   ============================================================ */
+PRINT '正在生成变更汇总报告...';
+GO
+
+SELECT 
+    '01-大屏数据展示' AS [业务线], 
+    '杨尧天' AS [负责人], 
+    'Dashboard_Config, Stat_Realtime, Stat_History_Trend' AS [涉及对象], 
+    '创建/补全表结构; 增加v4扩展字段(Config_Code等); 增加索引' AS [变更摘要]
+UNION ALL
+SELECT 
+    '02-综合能耗管理', 
+    '杨昊田', 
+    'Energy_Meter',
+    '修改 CK_Energy_Type 约束，增加“电”作为能源类型'
 UNION ALL
 SELECT 
     '03-告警运维管理', 
@@ -1766,13 +1790,17 @@ GO
 -- ============================================================
 -- 第一步：插入用户到 Sys_User 表
 -- ============================================================
+
+USE SQL_BFU
+GO
 INSERT INTO Sys_User (Login_Account, Login_Password, Salt, Real_Name, Department, Contact_Phone, Account_Status)
 VALUES 
 ('admin', 'c5c673c01d44ddbf4df065a752b20f19ca4f5b0dc2a8f6a92e23af672ad4cd11', 'VGVzdFNhbHQxMjM0NTY3OA==', '张管理', '信息技术部', '13800000001', 1),
 ('om_user', 'c5c673c01d44ddbf4df065a752b20f19ca4f5b0dc2a8f6a92e23af672ad4cd11', 'VGVzdFNhbHQxMjM0NTY3OA==', '李运维', '运维部', '13800000002', 1),
 ('energy_user', 'c5c673c01d44ddbf4df065a752b20f19ca4f5b0dc2a8f6a92e23af672ad4cd11', 'VGVzdFNhbHQxMjM0NTY3OA==', '王能源', '能源管理部', '13800000003', 1),
 ('analyst_user', 'c5c673c01d44ddbf4df065a752b20f19ca4f5b0dc2a8f6a92e23af672ad4cd11', 'VGVzdFNhbHQxMjM0NTY3OA==', '赵分析', '数据分析部', '13800000004', 1),
-('exec_user', 'c5c673c01d44ddbf4df065a752b20f19ca4f5b0dc2a8f6a92e23af672ad4cd11', 'VGVzdFNhbHQxMjM0NTY3OA==', '钱总监', '管理层', '13800000005', 1);
+('exec_user', 'c5c673c01d44ddbf4df065a752b20f19ca4f5b0dc2a8f6a92e23af672ad4cd11', 'VGVzdFNhbHQxMjM0NTY3OA==', '钱总监', '管理层', '13800000005', 1),
+('dispatcher', 'c5c673c01d44ddbf4df065a752b20f19ca4f5b0dc2a8f6a92e23af672ad4cd11', 'VGVzdFNhbHQxMjM0NTY3OA==', '胡调度', '运维工单调度部', '13800000006', 1); 
 
 -- ============================================================
 -- 第二步：插入角色表记录
@@ -1782,7 +1810,7 @@ INSERT INTO Role_OandM (User_ID) SELECT User_ID FROM Sys_User WHERE Login_Accoun
 INSERT INTO Role_EnergyMgr (User_ID) SELECT User_ID FROM Sys_User WHERE Login_Account = 'energy_user';
 INSERT INTO Role_Analyst (User_ID) SELECT User_ID FROM Sys_User WHERE Login_Account = 'analyst_user';
 INSERT INTO Role_Manager (User_ID) SELECT User_ID FROM Sys_User WHERE Login_Account = 'exec_user';
-
+INSERT INTO Role_Dispatcher (User_ID) SELECT User_ID FROM Sys_User WHERE Login_Account = 'dispatcher'; 
 -- ============================================================
 -- 第三步：分配角色到 Sys_Role_Assignment 表
 -- ============================================================
@@ -1801,26 +1829,30 @@ SELECT User_ID, 'ANALYST', NULL FROM Sys_User WHERE Login_Account = 'analyst_use
 INSERT INTO Sys_Role_Assignment (User_ID, Role_Type, Assigned_By)
 SELECT User_ID, 'EXEC', NULL FROM Sys_User WHERE Login_Account = 'exec_user';
 
+INSERT INTO Sys_Role_Assignment (User_ID, Role_Type, Assigned_By) 
+SELECT User_ID, 'DISPATCHER', NULL FROM Sys_User WHERE Login_Account = 'dispatcher'; 
+
 -- ============================================================
 -- 验证插入结果
 -- ============================================================
 SELECT 
-    u.User_ID,
-    u.Login_Account AS N'账号',
-    u.Real_Name AS N'姓名',
-    u.Department AS N'部门',
-    r.Role_Type AS N'角色',
-    CASE r.Role_Type
-        WHEN 'ADMIN' THEN '/admin/dashboard'
-        WHEN 'OM' THEN '/om/dashboard'
-        WHEN 'ENERGY' THEN '/energy/dashboard'
-        WHEN 'ANALYST' THEN '/analyst/dashboard'
-        WHEN 'EXEC' THEN '/exec/dashboard'
-    END AS N'登录跳转页面'
-FROM Sys_User u
-LEFT JOIN Sys_Role_Assignment r ON u.User_ID = r.User_ID
-WHERE u.Login_Account IN ('admin','om_user','energy_user','analyst_user','exec_user')
-ORDER BY u.User_ID;
+    u.User_ID, 
+    u.Login_Account AS N'账号', 
+    u.Real_Name AS N'姓名', 
+    u.Department AS N'部门', 
+    r.Role_Type AS N'角色', 
+    CASE r.Role_Type 
+        WHEN 'ADMIN' THEN '/admin/dashboard' 
+        WHEN 'OM' THEN '/om/dashboard' 
+        WHEN 'ENERGY' THEN '/energy/dashboard' 
+        WHEN 'ANALYST' THEN '/analyst/dashboard' 
+        WHEN 'EXEC' THEN '/exec/dashboard' 
+        WHEN 'DISPATCHER' THEN '/dispatcher/dashboard' 
+    END AS N'登录跳转页面' 
+FROM Sys_User u 
+LEFT JOIN Sys_Role_Assignment r ON u.User_ID = r.User_ID 
+WHERE u.Login_Account IN ('admin','om_user','energy_user','analyst_user','exec_user', 'dispatcher') 
+ORDER BY u.User_ID; 
 
 PRINT N'✓ 测试用户创建完成！所有用户密码: 123456';
 
