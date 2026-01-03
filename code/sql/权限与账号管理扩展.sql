@@ -1,9 +1,16 @@
+/* ======================= 2) 权限与账号管理扩展（已修复 DROP 顺序） ======================= */
+
 /* ============================================================
-   账号管理与权限扩展脚本 (修正版)
-   修正点：调整了 DROP TABLE 的顺序，先删子表 Sys_Role_Permission，再删父表 Sys_Permission，防止重复执行脚本报错
+   账号管理与权限扩展脚本
+   说明：为 Sys_User 增加审计字段，并新增权限相关表
    ============================================================ */
 
 USE SQL_BFU;
+GO
+
+IF OBJECT_ID('Sys_Role_Permission', 'U') IS NOT NULL DROP TABLE Sys_Role_Permission;
+GO
+IF OBJECT_ID('Sys_Permission', 'U') IS NOT NULL DROP TABLE Sys_Permission;
 GO
 
 /* === 1. Sys_User 扩展字段 === */
@@ -50,19 +57,7 @@ BEGIN
 END
 GO
 
-/* === 2. 权限表 (核心修改部分) === */
-
--- 【重要修改】必须先删除子表 (Sys_Role_Permission)，因为它有外键指向 Sys_Permission
-IF OBJECT_ID('Sys_Role_Permission', 'U') IS NOT NULL 
-    DROP TABLE Sys_Role_Permission;
-GO
-
--- 【重要修改】子表删除后，现在可以安全删除父表 (Sys_Permission) 了
-IF OBJECT_ID('Sys_Permission', 'U') IS NOT NULL 
-    DROP TABLE Sys_Permission;
-GO
-
--- 重新创建父表
+/* === 2. 权限表 === */
 CREATE TABLE Sys_Permission (
     Perm_Code NVARCHAR(64) PRIMARY KEY,
     Perm_Name NVARCHAR(100) NOT NULL,
@@ -71,9 +66,7 @@ CREATE TABLE Sys_Permission (
     Is_Enabled TINYINT DEFAULT 1,
     Created_Time DATETIME2(0) DEFAULT SYSDATETIME()
 );
-GO
 
--- 重新创建子表
 CREATE TABLE Sys_Role_Permission (
     Role_Type NVARCHAR(20) NOT NULL,
     Perm_Code NVARCHAR(64) NOT NULL,
@@ -82,7 +75,6 @@ CREATE TABLE Sys_Role_Permission (
     CONSTRAINT FK_RolePerm_Perm FOREIGN KEY (Perm_Code) REFERENCES Sys_Permission(Perm_Code),
     CONSTRAINT CK_RolePerm_Role_Type CHECK (Role_Type IN ('ADMIN','OM','ENERGY','ANALYST','EXEC','DISPATCHER'))
 );
-GO
 
 /* === 3. 初始化权限 === */
 INSERT INTO Sys_Permission (Perm_Code, Perm_Name, Module, Uri_Pattern) VALUES
@@ -92,9 +84,7 @@ INSERT INTO Sys_Permission (Perm_Code, Perm_Name, Module, Uri_Pattern) VALUES
 ('MODULE_ENERGY', N'综合能耗模块', 'energy', NULL),
 ('MODULE_ALARM', N'告警运维模块', 'alarm', NULL),
 ('MODULE_ADMIN', N'系统管理模块', 'admin', NULL),
-('MODULE_DISPATCHER', N'运维工单管理模块', 'dispatcher', NULL),
 ('ADMIN_USER_MANAGE', N'账号管理', NULL, '/admin');
-GO
 
 /* === 4. 初始化角色权限 === */
 -- 系统管理员：全部模块 + 账号管理
@@ -105,7 +95,6 @@ INSERT INTO Sys_Role_Permission (Role_Type, Perm_Code) VALUES
 ('ADMIN','MODULE_ENERGY'),
 ('ADMIN','MODULE_ALARM'),
 ('ADMIN','MODULE_ADMIN'),
-('ADMIN','MODULE_DISPATCHER'),
 ('ADMIN','ADMIN_USER_MANAGE');
 
 -- 运维人员
@@ -130,10 +119,6 @@ INSERT INTO Sys_Role_Permission (Role_Type, Perm_Code) VALUES
 ('EXEC','MODULE_DASHBOARD'),
 ('EXEC','MODULE_ENERGY');
 
--- 运维工单管理员
 INSERT INTO Sys_Role_Permission (Role_Type, Perm_Code) VALUES
 ('DISPATCHER','MODULE_DASHBOARD'),
-('DISPATCHER','MODULE_DISPATCHER');
-GO
-
-PRINT '账号扩展与权限表重建完成。';
+('DISPATCHER','MODULE_ENERGY');
