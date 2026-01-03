@@ -69,6 +69,36 @@
     <url-pattern>/admin</url-pattern>
   </servlet-mapping>
 
+  <!-- 配电网监测 Servlet -->
+  <servlet>
+    <servlet-name>DistServlet</servlet-name>
+    <servlet-class>com.bjfu.energy.controller.DistServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>DistServlet</servlet-name>
+    <url-pattern>/dist</url-pattern>
+  </servlet-mapping>
+  <!-- 如果你也需要 /dist/xxx 这样的子路径，就保留下面这个 -->
+  <servlet-mapping>
+    <servlet-name>DistServlet</servlet-name>
+    <url-pattern>/dist/*</url-pattern>
+  </servlet-mapping>
+
+  <!-- 告警运维 Servlet -->
+  <servlet>
+    <servlet-name>AlarmServlet</servlet-name>
+    <servlet-class>com.bjfu.energy.controller.AlarmServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>AlarmServlet</servlet-name>
+    <url-pattern>/alarm</url-pattern>
+  </servlet-mapping>
+  <!-- 如果你也需要 /alarm/xxx 这样的子路径，就保留下面这个 -->
+  <servlet-mapping>
+    <servlet-name>AlarmServlet</servlet-name>
+    <url-pattern>/alarm/*</url-pattern>
+  </servlet-mapping>
+
   <welcome-file-list>
     <welcome-file>index.jsp</welcome-file>
   </welcome-file-list>

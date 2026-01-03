@@ -18,6 +18,10 @@
     min-height: 100vh;
 }
 
+.dashboard-page {
+    padding: 0;
+}
+
 .dashboard-header {
     margin-bottom: 32px;
 }
@@ -315,16 +319,127 @@
     gap: 24px;
 }
 
-.main-content {
+.dashboard-main-content {
     display: flex;
     flex-direction: column;
     gap: 24px;
 }
 
-.side-content {
+.dashboard-side-content {
     display: flex;
     flex-direction: column;
     gap: 24px;
+}
+
+.dashboard-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.dashboard-meta-item {
+    background: white;
+    border-radius: 12px;
+    padding: 10px 16px;
+    font-size: 13px;
+    color: #475569;
+    box-shadow: 0 2px 4px rgba(15, 23, 42, 0.08);
+}
+
+.dashboard-section-hint {
+    font-size: 13px;
+    color: #94a3b8;
+    margin-top: 6px;
+}
+
+.dashboard-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #eef2ff;
+    color: #4338ca;
+}
+
+.dashboard-stat-card.water::before {
+    background: linear-gradient(180deg, #38bdf8 0%, #0ea5e9 100%);
+}
+
+.dashboard-stat-card.steam::before {
+    background: linear-gradient(180deg, #fbbf24 0%, #f97316 100%);
+}
+
+.dashboard-stat-card.gas::before {
+    background: linear-gradient(180deg, #94a3b8 0%, #64748b 100%);
+}
+
+.dashboard-stat-subtext {
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.trend-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.trend-tag.up {
+    background: #ecfdf3;
+    color: #047857;
+}
+
+.trend-tag.down {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.dashboard-callout {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 16px 20px;
+    border-left: 4px solid #6366f1;
+    color: #475569;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.dashboard-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.dashboard-action-card {
+    flex: 1;
+    min-width: 220px;
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dashboard-action-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.dashboard-action-desc {
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.6;
 }
 
 /* ======================= */

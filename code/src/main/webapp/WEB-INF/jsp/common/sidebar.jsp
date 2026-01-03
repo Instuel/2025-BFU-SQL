@@ -1,7 +1,7 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
-<c:set var="m" value="${param.module}" />
+<c:set var="m" value="${empty param.module ? requestScope.module : param.module}" />
 <c:set var="permModules" value="${sessionScope.currentPermModules}" />
 
 <div class="sidebar">
@@ -20,7 +20,7 @@
     </c:if>
     <c:if test="${permModules != null && permModules.contains('dist')}">
       <li>
-        <a class="<c:out value='${m==\"dist\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=dist">
+        <a class="<c:out value='${m==\"dist\" ? \"active\" : \"\"}'/>" href="${ctx}/dist?module=dist&action=room_list">
           <span class="icon">🔌</span> <span>配电网监测</span>
         </a>
       </li>

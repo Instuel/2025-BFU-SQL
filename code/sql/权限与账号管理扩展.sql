@@ -68,7 +68,7 @@ CREATE TABLE Sys_Role_Permission (
     Assigned_Time DATETIME2(0) DEFAULT SYSDATETIME(),
 
     CONSTRAINT FK_RolePerm_Perm FOREIGN KEY (Perm_Code) REFERENCES Sys_Permission(Perm_Code),
-    CONSTRAINT CK_RolePerm_Role_Type CHECK (Role_Type IN ('ADMIN','OM','ENERGY','ANALYST','EXEC'))
+    CONSTRAINT CK_RolePerm_Role_Type CHECK (Role_Type IN ('ADMIN','OM','ENERGY','ANALYST','EXEC','DISPATCHER'))
 );
 
 /* === 3. 初始化权限 === */
@@ -113,3 +113,7 @@ INSERT INTO Sys_Role_Permission (Role_Type, Perm_Code) VALUES
 INSERT INTO Sys_Role_Permission (Role_Type, Perm_Code) VALUES
 ('EXEC','MODULE_DASHBOARD'),
 ('EXEC','MODULE_ENERGY');
+
+INSERT INTO Sys_Role_Permission (Role_Type, Perm_Code) VALUES
+('DISPATCHER','MODULE_DASHBOARD'),
+('DISPATCHER','MODULE_ENERGY');

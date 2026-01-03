@@ -69,6 +69,80 @@
     color: var(--text-secondary);
 }
 
+.alarm-nav {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin: var(--spacing-xl) 0;
+    flex-wrap: wrap;
+}
+
+.alarm-nav .action-btn {
+    border-radius: 999px;
+}
+
+.alarm-status-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.alarm-status-tag.pending {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.alarm-status-tag.processing {
+    background: #e0f2fe;
+    color: #0284c7;
+}
+
+.alarm-status-tag.closed {
+    background: #ecfdf3;
+    color: #16a34a;
+}
+
+.alarm-sla-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #ecfeff;
+    color: #0e7490;
+}
+
+.alarm-sla-tag.overdue {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.warranty-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.warranty-tag.warning {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.warranty-tag.expired {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
 /* ======================= */
 /* 告警规则配置           */
 /* ======================= */

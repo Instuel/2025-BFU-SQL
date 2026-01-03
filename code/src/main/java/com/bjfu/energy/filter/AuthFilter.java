@@ -87,14 +87,34 @@ public class AuthFilter implements Filter {
             }
         }
 
+     // ...前面代码保持不变
+
         Set<String> permModules = (session == null) ? null : (Set<String>) session.getAttribute("currentPermModules");
         List<String> permUris = (session == null) ? null : (List<String>) session.getAttribute("currentPermUris");
 
+        // ---------------------------
+        // 模块级权限（RBAC）检查
+        // ---------------------------
+        // 说明：你的系统入口有两种：
+        // 1) /app?module=xxx（工作台路由）
+        // 2) /dist、/alarm、/admin（业务线 Servlet）
+        // 之前仅对 /app 做了 module 权限校验，导致访问 /dist、/alarm 直接走 uriPattern 校验，
+        // 但数据库里这些模块没有配置 Uri_Pattern，于是管理员也会 403。
+        String module = null;
         if (uri.startsWith(ctx + "/app")) {
-            String module = request.getParameter("module");
+            module = request.getParameter("module");
             if (module == null || module.trim().isEmpty()) {
                 module = "dashboard";
             }
+        } else if (uri.startsWith(ctx + "/dist")) {
+            module = "dist";
+        } else if (uri.startsWith(ctx + "/alarm")) {
+            module = "alarm";
+        } else if (uri.startsWith(ctx + "/admin")) {
+            module = "admin";
+        }
+
+        if (module != null) {
             if (permModules == null || !permModules.contains(module)) {
                 response.sendError(HttpServletResponse.SC_FORBIDDEN);
                 return;
@@ -103,12 +123,14 @@ public class AuthFilter implements Filter {
             return;
         }
 
+        // 其他非模块入口（比如你未来加的 /api/xxx）再走 Uri_Pattern
         if (!isUriPermitted(uri, ctx, permUris)) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN);
             return;
         }
 
         chain.doFilter(req, resp);
+
     }
 
     private boolean isUriPermitted(String uri, String ctx, List<String> permUris) {

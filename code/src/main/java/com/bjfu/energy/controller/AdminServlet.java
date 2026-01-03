@@ -191,7 +191,13 @@ public class AdminServlet extends HttpServlet {
     }
 
     private String buildRedirect(HttpServletRequest req, String message) {
-        String encoded = URLEncoder.encode(message, StandardCharsets.UTF_8);
+    	String encoded;
+    	try {
+    	    encoded = URLEncoder.encode(message == null ? "" : message, StandardCharsets.UTF_8.name());
+    	} catch (Exception e) {
+    	    // 理论上不会发生，因为 UTF-8 必定存在
+    	    encoded = "";
+    	}
         return req.getContextPath() + "/admin?action=list&message=" + encoded;
     }
 }
