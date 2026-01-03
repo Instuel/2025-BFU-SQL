@@ -17,6 +17,7 @@
     <a class="action-btn primary" href="${ctx}/alarm?action=list&module=alarm">告警列表</a>
     <a class="action-btn" href="${ctx}/alarm?action=workorderList&module=alarm">运维工单</a>
     <a class="action-btn" href="${ctx}/alarm?action=ledgerList&module=alarm">设备台账</a>
+    <a class="action-btn" href="${ctx}/alarm?action=maintenancePlanList&module=alarm">维护计划</a>
   </div>
 
   <c:if test="${not empty message}">
@@ -49,6 +50,18 @@
             <td>${alarm.processStatus}</td>
           </tr>
           <tr>
+            <th>真实性审核</th>
+            <td>
+              <c:choose>
+                <c:when test="${alarm.verifyStatus == '有效'}"><span class="alarm-verify-tag valid">有效</span></c:when>
+                <c:when test="${alarm.verifyStatus == '误报'}"><span class="alarm-verify-tag invalid">误报</span></c:when>
+                <c:otherwise><span class="alarm-verify-tag pending">待审核</span></c:otherwise>
+              </c:choose>
+            </td>
+            <th>审核备注</th>
+            <td>${alarm.verifyRemark}</td>
+          </tr>
+          <tr>
             <th>关联设备</th>
             <td>${alarm.deviceName} (${alarm.deviceType})</td>
             <th>设备台账编号</th>
@@ -79,6 +92,28 @@
           </tbody>
         </table>
       </div>
+
+      <form action="${ctx}/alarm" method="post" style="margin-top:20px;">
+        <input type="hidden" name="action" value="updateAlarmVerify"/>
+        <input type="hidden" name="alarmId" value="${alarm.alarmId}"/>
+        <div class="rule-form-grid">
+          <div class="form-group">
+            <label>真实性审核</label>
+            <select name="verifyStatus">
+              <option value="待审核" <c:if test="${alarm.verifyStatus == '待审核' || empty alarm.verifyStatus}">selected</c:if>>待审核</option>
+              <option value="有效" <c:if test="${alarm.verifyStatus == '有效'}">selected</c:if>>有效</option>
+              <option value="误报" <c:if test="${alarm.verifyStatus == '误报'}">selected</c:if>>误报</option>
+            </select>
+          </div>
+          <div class="form-group" style="grid-column:1 / -1;">
+            <label>审核说明</label>
+            <textarea name="verifyRemark" rows="3" placeholder="填写误报原因或核实说明">${alarm.verifyRemark}</textarea>
+          </div>
+          <div class="form-group" style="display:flex;align-items:flex-end;">
+            <button class="btn btn-primary" type="submit">保存审核</button>
+          </div>
+        </div>
+      </form>
 
       <form action="${ctx}/alarm" method="post" style="margin-top:20px;">
         <input type="hidden" name="action" value="updateAlarmStatus"/>
@@ -125,7 +160,14 @@
       </c:if>
 
       <c:if test="${workOrder == null}">
-        <p style="color:#64748b;margin-bottom:16px;">当前告警尚未派单，管理员可直接生成运维工单。</p>
+        <c:choose>
+          <c:when test="${alarm.verifyStatus != '有效'}">
+            <div class="warning-message">当前告警尚未通过真实性审核，请先完成审核后再派单。</div>
+          </c:when>
+          <c:otherwise>
+            <p style="color:#64748b;margin-bottom:16px;">当前告警尚未派单，管理员可直接生成运维工单。</p>
+          </c:otherwise>
+        </c:choose>
         <form action="${ctx}/alarm" method="post">
           <input type="hidden" name="action" value="createWorkOrder"/>
           <input type="hidden" name="alarmId" value="${alarm.alarmId}"/>
@@ -151,7 +193,7 @@
               <textarea name="resultDesc" rows="3" placeholder="补充派单说明"></textarea>
             </div>
             <div class="form-group" style="display:flex;align-items:flex-end;">
-              <button class="btn btn-primary" type="submit">生成运维工单</button>
+              <button class="btn btn-primary" type="submit" <c:if test="${alarm.verifyStatus != '有效'}">disabled</c:if>>生成运维工单</button>
             </div>
           </div>
         </form>

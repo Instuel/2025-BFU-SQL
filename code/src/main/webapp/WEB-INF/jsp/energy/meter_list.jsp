@@ -71,6 +71,9 @@
           <a class="action-btn primary" href="${ctx}/app?module=energy&view=energy_data_list">监测数据</a>
           <a class="action-btn secondary" href="${ctx}/app?module=energy&view=peak_valley_list">峰谷统计</a>
           <a class="action-btn" href="${ctx}/app?module=energy&view=peak_valley_report">能耗报告</a>
+          <a class="action-btn" href="${ctx}/app?module=energy&view=report_overview">月度报表</a>
+          <a class="action-btn" href="${ctx}/app?module=energy&view=data_review">数据审核</a>
+          <a class="action-btn" href="${ctx}/app?module=energy&view=optimization_plan">优化方案</a>
         </div>
       </div>
       <p style="color:#64748b;margin:0;">提示：设备信息用于关联能耗监测数据与峰谷统计报表。</p>

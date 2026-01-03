@@ -24,6 +24,8 @@ public class AlarmInfoDaoImpl implements AlarmInfoDao {
             alarm.setOccurTime(occur.toLocalDateTime());
         }
         alarm.setProcessStatus(rs.getString("Process_Status"));
+        alarm.setVerifyStatus(rs.getString("Verify_Status"));
+        alarm.setVerifyRemark(rs.getString("Verify_Remark"));
         long ledgerId = rs.getLong("Ledger_ID");
         if (rs.wasNull()) {
             alarm.setLedgerId(null);
@@ -54,10 +56,10 @@ public class AlarmInfoDaoImpl implements AlarmInfoDao {
     }
 
     @Override
-    public List<AlarmInfo> findAll(String alarmType, String alarmLevel, String processStatus) throws Exception {
+    public List<AlarmInfo> findAll(String alarmType, String alarmLevel, String processStatus, String verifyStatus) throws Exception {
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT a.Alarm_ID, a.Alarm_Type, a.Alarm_Level, a.Content, a.Occur_Time, ")
-           .append("a.Process_Status, a.Ledger_ID, a.Factory_ID, a.Trigger_Threshold, ")
+           .append("a.Process_Status, a.Verify_Status, a.Verify_Remark, a.Ledger_ID, a.Factory_ID, a.Trigger_Threshold, ")
            .append("l.Device_Name, l.Device_Type, w.Order_ID, w.Dispatch_Time ")
            .append("FROM Alarm_Info a ")
            .append("LEFT JOIN Device_Ledger l ON a.Ledger_ID = l.Ledger_ID ")
@@ -75,6 +77,15 @@ public class AlarmInfoDaoImpl implements AlarmInfoDao {
         if (processStatus != null && !processStatus.trim().isEmpty()) {
             sql.append("AND a.Process_Status = ? ");
             params.add(processStatus.trim());
+        }
+        if (verifyStatus != null && !verifyStatus.trim().isEmpty()) {
+            String status = verifyStatus.trim();
+            if ("待审核".equals(status)) {
+                sql.append("AND (a.Verify_Status = ? OR a.Verify_Status IS NULL) ");
+            } else {
+                sql.append("AND a.Verify_Status = ? ");
+            }
+            params.add(status);
         }
         sql.append("ORDER BY a.Occur_Time DESC, a.Alarm_ID DESC");
 
@@ -96,7 +107,7 @@ public class AlarmInfoDaoImpl implements AlarmInfoDao {
     @Override
     public AlarmInfo findById(Long alarmId) throws Exception {
         String sql = "SELECT TOP 1 a.Alarm_ID, a.Alarm_Type, a.Alarm_Level, a.Content, a.Occur_Time, " +
-                     "a.Process_Status, a.Ledger_ID, a.Factory_ID, a.Trigger_Threshold, " +
+                     "a.Process_Status, a.Verify_Status, a.Verify_Remark, a.Ledger_ID, a.Factory_ID, a.Trigger_Threshold, " +
                      "l.Device_Name, l.Device_Type, w.Order_ID, w.Dispatch_Time " +
                      "FROM Alarm_Info a " +
                      "LEFT JOIN Device_Ledger l ON a.Ledger_ID = l.Ledger_ID " +
@@ -121,6 +132,18 @@ public class AlarmInfoDaoImpl implements AlarmInfoDao {
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, processStatus);
             ps.setLong(2, alarmId);
+            ps.executeUpdate();
+        }
+    }
+
+    @Override
+    public void updateVerification(Long alarmId, String verifyStatus, String verifyRemark) throws Exception {
+        String sql = "UPDATE Alarm_Info SET Verify_Status = ?, Verify_Remark = ? WHERE Alarm_ID = ?";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, verifyStatus);
+            ps.setString(2, verifyRemark);
+            ps.setLong(3, alarmId);
             ps.executeUpdate();
         }
     }

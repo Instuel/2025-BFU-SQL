@@ -11,6 +11,8 @@ public class AlarmInfo {
     private String content;
     private LocalDateTime occurTime;
     private String processStatus;
+    private String verifyStatus;
+    private String verifyRemark;
     private Long ledgerId;
     private Long factoryId;
     private BigDecimal triggerThreshold;
@@ -68,6 +70,22 @@ public class AlarmInfo {
 
     public void setProcessStatus(String processStatus) {
         this.processStatus = processStatus;
+    }
+
+    public String getVerifyStatus() {
+        return verifyStatus;
+    }
+
+    public void setVerifyStatus(String verifyStatus) {
+        this.verifyStatus = verifyStatus;
+    }
+
+    public String getVerifyRemark() {
+        return verifyRemark;
+    }
+
+    public void setVerifyRemark(String verifyRemark) {
+        this.verifyRemark = verifyRemark;
     }
 
     public Long getLedgerId() {

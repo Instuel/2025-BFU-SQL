@@ -8,6 +8,7 @@
     <h2>系统管理 - 账号管理</h2>
     <a class="btn btn-primary" href="${pageContext.request.contextPath}/admin?action=create">新增账号</a>
   </div>
+  <%@ include file="/WEB-INF/jsp/admin/admin_nav.jsp" %>
 
   <c:if test="${not empty message}">
     <div class="success-message" style="margin-top:12px;">${message}</div>

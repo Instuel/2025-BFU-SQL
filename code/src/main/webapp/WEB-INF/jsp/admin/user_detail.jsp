@@ -5,6 +5,7 @@
 
 <div class="main-content">
   <h2>系统管理 - 账号详情</h2>
+  <%@ include file="/WEB-INF/jsp/admin/admin_nav.jsp" %>
 
   <c:if test="${not empty error}">
     <div class="error-message" style="margin-top:12px;">${error}</div>

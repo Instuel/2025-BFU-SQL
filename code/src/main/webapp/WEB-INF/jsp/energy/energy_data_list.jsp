@@ -25,6 +25,7 @@
           </c:forEach>
         </select>
         <button class="action-btn primary">筛选</button>
+        <a class="action-btn secondary" href="${ctx}/app?module=energy&view=data_review">数据质量审核</a>
         <a class="action-btn" href="${ctx}/app?module=energy&view=meter_list">返回设备台账</a>
       </form>
     </div>
@@ -81,7 +82,19 @@
               <td><c:out value="${record.collectTime}" default="-"/></td>
               <td><c:out value="${record.value}" default="-"/></td>
               <td><c:out value="${record.unit}" default="-"/></td>
-              <td><span class="status-badge normal"><c:out value="${record.quality}" default="-"/></span></td>
+              <td>
+                <c:choose>
+                  <c:when test="${record.quality == '差'}">
+                    <span class="status-badge error">差</span>
+                  </c:when>
+                  <c:when test="${record.quality == '中'}">
+                    <span class="status-badge warning">中</span>
+                  </c:when>
+                  <c:otherwise>
+                    <span class="status-badge normal"><c:out value="${record.quality}" default="-"/></span>
+                  </c:otherwise>
+                </c:choose>
+              </td>
               <td><c:out value="${record.factoryName}" default="-"/></td>
             </tr>
           </c:forEach>

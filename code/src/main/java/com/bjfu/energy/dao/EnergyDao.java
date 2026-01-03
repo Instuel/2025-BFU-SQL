@@ -238,4 +238,353 @@ public class EnergyDao {
         }
         return new HashMap<>();
     }
+
+    public List<Map<String, Object>> listMonthlyEnergyReports(Long factoryId, String energyType) throws Exception {
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT CONVERT(VARCHAR(7), p.Stat_Date, 120) AS reportMonth, ")
+           .append("f.Factory_Name AS factoryName, ")
+           .append("p.Energy_Type AS energyType, ")
+           .append("SUM(CASE WHEN p.Peak_Type IN ('尖峰','高峰') THEN p.Total_Consumption ELSE 0 END) AS peakConsumption, ")
+           .append("SUM(CASE WHEN p.Peak_Type = '低谷' THEN p.Total_Consumption ELSE 0 END) AS valleyConsumption, ")
+           .append("SUM(p.Total_Consumption) AS totalConsumption, ")
+           .append("SUM(p.Cost_Amount) AS totalCost, ")
+           .append("SUM(CASE WHEN p.Peak_Type IN ('尖峰','高峰') THEN p.Total_Consumption ELSE 0 END) ")
+           .append("- SUM(CASE WHEN p.Peak_Type = '低谷' THEN p.Total_Consumption ELSE 0 END) AS peakValleyGap ")
+           .append("FROM Data_PeakValley p ")
+           .append("JOIN Base_Factory f ON p.Factory_ID = f.Factory_ID ")
+           .append("WHERE 1=1 ");
+        List<Object> params = new ArrayList<>();
+        if (factoryId != null) {
+            sql.append("AND p.Factory_ID = ? ");
+            params.add(factoryId);
+        }
+        if (energyType != null && !energyType.isEmpty() && !"全部".equals(energyType)) {
+            sql.append("AND p.Energy_Type = ? ");
+            params.add(energyType);
+        }
+        sql.append("GROUP BY CONVERT(VARCHAR(7), p.Stat_Date, 120), f.Factory_Name, p.Energy_Type ")
+           .append("ORDER BY reportMonth DESC, f.Factory_Name");
+        List<Map<String, Object>> items = new ArrayList<>();
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    items.add(mapRow(rs));
+                }
+            }
+        }
+        return items;
+    }
+
+    public Map<String, Object> getLatestMonthlyReportStats() throws Exception {
+        String monthSql = "SELECT TOP 1 CONVERT(VARCHAR(7), Stat_Date, 120) AS reportMonth " +
+                          "FROM Data_PeakValley ORDER BY Stat_Date DESC";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(monthSql);
+             ResultSet rs = ps.executeQuery()) {
+            if (!rs.next()) {
+                return new HashMap<>();
+            }
+            String reportMonth = rs.getString("reportMonth");
+            String detailSql = "SELECT ? AS reportMonth, " +
+                               "SUM(CASE WHEN Peak_Type IN ('尖峰','高峰') THEN Total_Consumption ELSE 0 END) AS peakConsumption, " +
+                               "SUM(CASE WHEN Peak_Type = '低谷' THEN Total_Consumption ELSE 0 END) AS valleyConsumption, " +
+                               "SUM(Total_Consumption) AS totalConsumption, " +
+                               "SUM(Cost_Amount) AS totalCost " +
+                               "FROM Data_PeakValley " +
+                               "WHERE CONVERT(VARCHAR(7), Stat_Date, 120) = ?";
+            try (PreparedStatement detailPs = conn.prepareStatement(detailSql)) {
+                detailPs.setString(1, reportMonth);
+                detailPs.setString(2, reportMonth);
+                try (ResultSet detailRs = detailPs.executeQuery()) {
+                    if (detailRs.next()) {
+                        return mapRow(detailRs);
+                    }
+                }
+            }
+        }
+        return new HashMap<>();
+    }
+
+    public Map<String, Object> getQualityReviewStats(Long factoryId, String energyType, String quality)
+            throws Exception {
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT COUNT(*) AS totalCount, ")
+           .append("SUM(CASE WHEN r.Review_ID IS NULL THEN 1 ELSE 0 END) AS pendingCount, ")
+           .append("SUM(CASE WHEN r.Review_ID IS NOT NULL THEN 1 ELSE 0 END) AS reviewedCount ")
+           .append("FROM Data_Energy d ")
+           .append("JOIN Energy_Meter m ON d.Meter_ID = m.Meter_ID ")
+           .append("LEFT JOIN Energy_Data_Review r ON d.Data_ID = r.Data_ID ")
+           .append("WHERE d.Quality IN ('中','差') ");
+        List<Object> params = new ArrayList<>();
+        if (factoryId != null) {
+            sql.append("AND d.Factory_ID = ? ");
+            params.add(factoryId);
+        }
+        if (energyType != null && !energyType.isEmpty() && !"全部".equals(energyType)) {
+            sql.append("AND m.Energy_Type = ? ");
+            params.add(energyType);
+        }
+        if (quality != null && !quality.isEmpty() && !"全部".equals(quality)) {
+            sql.append("AND d.Quality = ? ");
+            params.add(quality);
+        }
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return mapRow(rs);
+                }
+            }
+        }
+        return new HashMap<>();
+    }
+
+    public List<Map<String, Object>> listQualityIssueRecords(Long factoryId, String energyType, String quality)
+            throws Exception {
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT d.Data_ID AS dataId, ")
+           .append("COALESCE(l.Device_Name, CONCAT('EM-', d.Meter_ID)) AS meterCode, ")
+           .append("m.Energy_Type AS energyType, ")
+           .append("CONVERT(VARCHAR(19), d.Collect_Time, 120) AS collectTime, ")
+           .append("d.Value AS value, d.Unit AS unit, d.Quality AS quality, ")
+           .append("f.Factory_Name AS factoryName, ")
+           .append("r.Review_Status AS reviewStatus, r.Reviewer AS reviewer, ")
+           .append("r.Review_Remark AS reviewRemark, ")
+           .append("CONVERT(VARCHAR(19), r.Review_Time, 120) AS reviewTime ")
+           .append("FROM Data_Energy d ")
+           .append("JOIN Energy_Meter m ON d.Meter_ID = m.Meter_ID ")
+           .append("LEFT JOIN Device_Ledger l ON m.Ledger_ID = l.Ledger_ID ")
+           .append("JOIN Base_Factory f ON d.Factory_ID = f.Factory_ID ")
+           .append("LEFT JOIN Energy_Data_Review r ON d.Data_ID = r.Data_ID ")
+           .append("WHERE d.Quality IN ('中','差') ");
+        List<Object> params = new ArrayList<>();
+        if (factoryId != null) {
+            sql.append("AND d.Factory_ID = ? ");
+            params.add(factoryId);
+        }
+        if (energyType != null && !energyType.isEmpty() && !"全部".equals(energyType)) {
+            sql.append("AND m.Energy_Type = ? ");
+            params.add(energyType);
+        }
+        if (quality != null && !quality.isEmpty() && !"全部".equals(quality)) {
+            sql.append("AND d.Quality = ? ");
+            params.add(quality);
+        }
+        sql.append("ORDER BY d.Collect_Time DESC");
+        List<Map<String, Object>> records = new ArrayList<>();
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    records.add(mapRow(rs));
+                }
+            }
+        }
+        return records;
+    }
+
+    public void upsertEnergyDataReview(long dataId, String reviewStatus, String reviewer, String remark)
+            throws Exception {
+        String selectSql = "SELECT Review_ID AS reviewId FROM Energy_Data_Review WHERE Data_ID = ?";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement selectPs = conn.prepareStatement(selectSql)) {
+            selectPs.setLong(1, dataId);
+            try (ResultSet rs = selectPs.executeQuery()) {
+                if (rs.next()) {
+                    long reviewId = rs.getLong("reviewId");
+                    String updateSql = "UPDATE Energy_Data_Review SET Review_Status = ?, Reviewer = ?, " +
+                                       "Review_Remark = ?, Review_Time = GETDATE() WHERE Review_ID = ?";
+                    try (PreparedStatement updatePs = conn.prepareStatement(updateSql)) {
+                        updatePs.setString(1, reviewStatus);
+                        updatePs.setString(2, reviewer);
+                        updatePs.setString(3, remark);
+                        updatePs.setLong(4, reviewId);
+                        updatePs.executeUpdate();
+                    }
+                } else {
+                    String insertSql = "INSERT INTO Energy_Data_Review " +
+                                       "(Data_ID, Review_Status, Reviewer, Review_Remark, Review_Time) " +
+                                       "VALUES (?, ?, ?, ?, GETDATE())";
+                    try (PreparedStatement insertPs = conn.prepareStatement(insertSql)) {
+                        insertPs.setLong(1, dataId);
+                        insertPs.setString(2, reviewStatus);
+                        insertPs.setString(3, reviewer);
+                        insertPs.setString(4, remark);
+                        insertPs.executeUpdate();
+                    }
+                }
+            }
+        }
+    }
+
+    public Map<String, Object> getInvestigationStats() throws Exception {
+        String sql = "SELECT COUNT(*) AS totalCount, " +
+                     "SUM(CASE WHEN Status = '已完成' THEN 1 ELSE 0 END) AS completedCount, " +
+                     "SUM(CASE WHEN Status <> '已完成' THEN 1 ELSE 0 END) AS activeCount " +
+                     "FROM Energy_Investigation";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return mapRow(rs);
+            }
+        }
+        return new HashMap<>();
+    }
+
+    public List<Map<String, Object>> listHighConsumptionAreas() throws Exception {
+        String sql = "WITH LatestDate AS ( " +
+                     "    SELECT MAX(Stat_Date) AS statDate FROM Data_PeakValley " +
+                     "), AvgConsumption AS ( " +
+                     "    SELECT Energy_Type, AVG(Total_Consumption) AS avgConsumption " +
+                     "    FROM Data_PeakValley " +
+                     "    WHERE Stat_Date = (SELECT statDate FROM LatestDate) " +
+                     "    GROUP BY Energy_Type " +
+                     ") " +
+                     "SELECT p.Stat_Date AS statDate, f.Factory_Name AS factoryName, p.Energy_Type AS energyType, " +
+                     "SUM(p.Total_Consumption) AS totalConsumption, a.avgConsumption AS avgConsumption, " +
+                     "CASE WHEN a.avgConsumption = 0 THEN 0 " +
+                     "ELSE (SUM(p.Total_Consumption) - a.avgConsumption) / a.avgConsumption * 100 END AS overRate " +
+                     "FROM Data_PeakValley p " +
+                     "JOIN AvgConsumption a ON p.Energy_Type = a.Energy_Type " +
+                     "JOIN Base_Factory f ON p.Factory_ID = f.Factory_ID " +
+                     "WHERE p.Stat_Date = (SELECT statDate FROM LatestDate) " +
+                     "GROUP BY p.Stat_Date, f.Factory_Name, p.Energy_Type, a.avgConsumption " +
+                     "HAVING SUM(p.Total_Consumption) >= a.avgConsumption * 1.3 " +
+                     "ORDER BY totalConsumption DESC";
+        List<Map<String, Object>> items = new ArrayList<>();
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                items.add(mapRow(rs));
+            }
+        }
+        return items;
+    }
+
+    public List<Map<String, Object>> listInvestigations() throws Exception {
+        String sql = "SELECT i.Investigation_ID AS investigationId, i.Issue_Desc AS issueDesc, " +
+                     "i.Energy_Type AS energyType, f.Factory_Name AS factoryName, i.Level AS level, " +
+                     "i.Status AS status, i.Owner AS owner, CONVERT(VARCHAR(19), i.Create_Time, 120) AS createTime " +
+                     "FROM Energy_Investigation i " +
+                     "LEFT JOIN Base_Factory f ON i.Factory_ID = f.Factory_ID " +
+                     "ORDER BY i.Create_Time DESC";
+        List<Map<String, Object>> items = new ArrayList<>();
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                items.add(mapRow(rs));
+            }
+        }
+        return items;
+    }
+
+    public void createInvestigation(Long factoryId, String energyType, String level, String issueDesc, String owner)
+            throws Exception {
+        String sql = "INSERT INTO Energy_Investigation " +
+                     "(Factory_ID, Energy_Type, Level, Issue_Desc, Status, Owner, Create_Time) " +
+                     "VALUES (?, ?, ?, ?, '进行中', ?, GETDATE())";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setObject(1, factoryId);
+            ps.setString(2, energyType);
+            ps.setString(3, level);
+            ps.setString(4, issueDesc);
+            ps.setString(5, owner);
+            ps.executeUpdate();
+        }
+    }
+
+    public Map<String, Object> getOptimizationStats() throws Exception {
+        String sql = "SELECT COUNT(*) AS totalCount, " +
+                     "SUM(CASE WHEN Status = '已完成' THEN 1 ELSE 0 END) AS completedCount, " +
+                     "SUM(CASE WHEN Status <> '已完成' THEN 1 ELSE 0 END) AS activeCount " +
+                     "FROM Energy_Optimization_Plan";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return mapRow(rs);
+            }
+        }
+        return new HashMap<>();
+    }
+
+    public List<Map<String, Object>> listOptimizationPlans() throws Exception {
+        String sql = "SELECT p.Plan_ID AS planId, p.Plan_Title AS planTitle, p.Plan_Action AS planAction, " +
+                     "p.Energy_Type AS energyType, f.Factory_Name AS factoryName, " +
+                     "p.Target_Reduction AS targetReduction, p.Actual_Reduction AS actualReduction, " +
+                     "p.Status AS status, p.Owner AS owner, p.Start_Date AS startDate " +
+                     "FROM Energy_Optimization_Plan p " +
+                     "LEFT JOIN Base_Factory f ON p.Factory_ID = f.Factory_ID " +
+                     "ORDER BY p.Start_Date DESC";
+        List<Map<String, Object>> items = new ArrayList<>();
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                items.add(mapRow(rs));
+            }
+        }
+        return items;
+    }
+
+    public void createOptimizationPlan(Long factoryId, String energyType, String planTitle, String planAction,
+                                       java.sql.Date startDate, java.math.BigDecimal targetReduction, String owner)
+            throws Exception {
+        String sql = "INSERT INTO Energy_Optimization_Plan " +
+                     "(Factory_ID, Energy_Type, Plan_Title, Plan_Action, Start_Date, Target_Reduction, " +
+                     "Actual_Reduction, Status, Owner) " +
+                     "VALUES (?, ?, ?, ?, ?, ?, 0, '执行中', ?)";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setObject(1, factoryId);
+            ps.setString(2, energyType);
+            ps.setString(3, planTitle);
+            ps.setString(4, planAction);
+            ps.setDate(5, startDate);
+            ps.setBigDecimal(6, targetReduction);
+            ps.setString(7, owner);
+            ps.executeUpdate();
+        }
+    }
+
+    public int getPendingReviewCount() throws Exception {
+        String sql = "SELECT COUNT(*) AS pendingCount " +
+                     "FROM Data_Energy d " +
+                     "LEFT JOIN Energy_Data_Review r ON d.Data_ID = r.Data_ID " +
+                     "WHERE d.Quality IN ('中','差') AND r.Review_ID IS NULL";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return rs.getInt("pendingCount");
+            }
+        }
+        return 0;
+    }
+
+    public int getActivePlanCount() throws Exception {
+        String sql = "SELECT COUNT(*) AS activeCount FROM Energy_Optimization_Plan WHERE Status <> '已完成'";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return rs.getInt("activeCount");
+            }
+        }
+        return 0;
+    }
 }

@@ -21,6 +21,7 @@ public class WorkOrder {
     private String alarmStatus;
     private String deviceName;
     private String deviceType;
+    private boolean responseOverdue;
 
     public Long getOrderId() {
         return orderId;
@@ -148,5 +149,13 @@ public class WorkOrder {
 
     public void setDeviceType(String deviceType) {
         this.deviceType = deviceType;
+    }
+
+    public boolean isResponseOverdue() {
+        return responseOverdue;
+    }
+
+    public void setResponseOverdue(boolean responseOverdue) {
+        this.responseOverdue = responseOverdue;
     }
 }

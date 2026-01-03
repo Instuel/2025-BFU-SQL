@@ -122,6 +122,32 @@
     color: #b91c1c;
 }
 
+.alarm-verify-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.alarm-verify-tag.pending {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.alarm-verify-tag.valid {
+    background: #ecfdf3;
+    color: #16a34a;
+}
+
+.alarm-verify-tag.invalid {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
 .warranty-tag {
     display: inline-flex;
     align-items: center;
@@ -402,6 +428,22 @@
 .order-priority.low {
     background: #e8f5e9;
     color: #4caf50;
+}
+
+.order-reminder-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.order-reminder-tag.overdue {
+    background: #fef3c7;
+    color: #b45309;
 }
 
 .order-details {

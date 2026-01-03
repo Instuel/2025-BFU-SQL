@@ -15,6 +15,7 @@
     <a class="action-btn" href="${ctx}/alarm?action=list&module=alarm">告警列表</a>
     <a class="action-btn primary" href="${ctx}/alarm?action=workorderList&module=alarm">运维工单</a>
     <a class="action-btn" href="${ctx}/alarm?action=ledgerList&module=alarm">设备台账</a>
+    <a class="action-btn" href="${ctx}/alarm?action=maintenancePlanList&module=alarm">维护计划</a>
   </div>
 
   <c:if test="${not empty message}">
@@ -33,6 +34,10 @@
     <div class="order-stat-card completed">
       <div class="order-stat-label">已完成</div>
       <div class="order-stat-value">${orderCompleted}</div>
+    </div>
+    <div class="order-stat-card">
+      <div class="order-stat-label">超时未响应</div>
+      <div class="order-stat-value">${orderOverdue}</div>
     </div>
     <div class="order-stat-card">
       <div class="order-stat-label">工单总数</div>
@@ -73,6 +78,7 @@
         <th>派单时间</th>
         <th>响应时间</th>
         <th>完成时间</th>
+        <th>提醒状态</th>
         <th>复查状态</th>
         <th>操作</th>
       </tr>
@@ -94,6 +100,16 @@
           <td>${o.dispatchTime}</td>
           <td>${o.responseTime}</td>
           <td>${o.finishTime}</td>
+          <td>
+            <c:choose>
+              <c:when test="${o.responseOverdue}">
+                <span class="order-reminder-tag overdue">超时提醒</span>
+              </c:when>
+              <c:otherwise>
+                <span class="order-reminder-tag">正常</span>
+              </c:otherwise>
+            </c:choose>
+          </td>
           <td>${o.reviewStatus}</td>
           <td>
             <a class="btn btn-link" href="${ctx}/alarm?action=workorderDetail&id=${o.orderId}&module=alarm">查看</a>
@@ -102,7 +118,7 @@
       </c:forEach>
       <c:if test="${empty orders}">
         <tr>
-          <td colspan="9" style="text-align:center;color:#94a3b8;">暂无工单数据</td>
+          <td colspan="10" style="text-align:center;color:#94a3b8;">暂无工单数据</td>
         </tr>
       </c:if>
       </tbody>

@@ -15,17 +15,23 @@
     <a class="action-btn primary" href="${ctx}/alarm?action=list&module=alarm">告警列表</a>
     <a class="action-btn" href="${ctx}/alarm?action=workorderList&module=alarm">运维工单</a>
     <a class="action-btn" href="${ctx}/alarm?action=ledgerList&module=alarm">设备台账</a>
+    <a class="action-btn" href="${ctx}/alarm?action=maintenancePlanList&module=alarm">维护计划</a>
   </div>
 
   <c:if test="${not empty message}">
     <div class="success-message" style="margin-bottom:16px;">${message}</div>
   </c:if>
 
-  <div class="stats-grid stats-grid-4">
+  <div class="stats-grid">
     <div class="stat-card alarm">
       <div class="stat-label">告警总数</div>
       <div class="stat-value">${totalCount}</div>
       <div class="stat-change">全量告警汇总</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">待审核告警</div>
+      <div class="stat-value">${verifyPendingCount}</div>
+      <div class="stat-change">需确认真实性</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">高等级告警</div>
@@ -36,6 +42,11 @@
       <div class="stat-label">处理中</div>
       <div class="stat-value">${processingCount}</div>
       <div class="stat-change">正在处理的告警</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">误报剔除</div>
+      <div class="stat-value">${falseAlarmCount}</div>
+      <div class="stat-change">已确认误报</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">超时派单</div>
@@ -78,6 +89,15 @@
           <option value="已结案" <c:if test="${processStatus == '已结案'}">selected</c:if>>已结案</option>
         </select>
       </div>
+      <div class="form-group">
+        <label>真实性</label>
+        <select name="verifyStatus">
+          <option value="">全部</option>
+          <option value="待审核" <c:if test="${verifyStatus == '待审核'}">selected</c:if>>待审核</option>
+          <option value="有效" <c:if test="${verifyStatus == '有效'}">selected</c:if>>有效</option>
+          <option value="误报" <c:if test="${verifyStatus == '误报'}">selected</c:if>>误报</option>
+        </select>
+      </div>
       <div class="form-group" style="display:flex;align-items:flex-end;gap:12px;">
         <button class="btn btn-primary" type="submit">应用筛选</button>
         <a class="btn btn-secondary" href="${ctx}/alarm?action=list&module=alarm">重置</a>
@@ -95,6 +115,7 @@
         <th>告警内容</th>
         <th>发生时间</th>
         <th>处理状态</th>
+        <th>真实性</th>
         <th>关联设备</th>
         <th>派单时效</th>
         <th>操作</th>
@@ -117,6 +138,13 @@
               <c:when test="${a.processStatus == '未处理'}"><span class="alarm-status-tag pending">未处理</span></c:when>
               <c:when test="${a.processStatus == '处理中'}"><span class="alarm-status-tag processing">处理中</span></c:when>
               <c:otherwise><span class="alarm-status-tag closed">已结案</span></c:otherwise>
+            </c:choose>
+          </td>
+          <td>
+            <c:choose>
+              <c:when test="${a.verifyStatus == '有效'}"><span class="alarm-verify-tag valid">有效</span></c:when>
+              <c:when test="${a.verifyStatus == '误报'}"><span class="alarm-verify-tag invalid">误报</span></c:when>
+              <c:otherwise><span class="alarm-verify-tag pending">待审核</span></c:otherwise>
             </c:choose>
           </td>
           <td>
@@ -146,7 +174,7 @@
       </c:forEach>
       <c:if test="${empty alarms}">
         <tr>
-          <td colspan="9" style="text-align:center;color:#94a3b8;">暂无告警数据</td>
+          <td colspan="10" style="text-align:center;color:#94a3b8;">暂无告警数据</td>
         </tr>
       </c:if>
       </tbody>

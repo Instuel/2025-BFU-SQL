@@ -550,6 +550,40 @@
 }
 
 /* ======================= */
+/* 系统管理员导航         */
+/* ======================= */
+
+.admin-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 12px 0 20px 0;
+}
+
+.admin-nav a {
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s ease;
+}
+
+.admin-nav a:hover {
+    color: #1d4ed8;
+    border-color: #93c5fd;
+    background: #e0f2fe;
+}
+
+.admin-nav a.active {
+    background: #6366f1;
+    border-color: #4f46e5;
+    color: white;
+}
+
+/* ======================= */
 /* 快速操作区             */
 /* ======================= */
 

@@ -17,6 +17,7 @@
     <a class="action-btn" href="${ctx}/alarm?action=list&module=alarm">告警列表</a>
     <a class="action-btn" href="${ctx}/alarm?action=workorderList&module=alarm">运维工单</a>
     <a class="action-btn primary" href="${ctx}/alarm?action=ledgerList&module=alarm">设备台账</a>
+    <a class="action-btn" href="${ctx}/alarm?action=maintenancePlanList&module=alarm">维护计划</a>
   </div>
 
   <c:if test="${not empty message}">
@@ -108,6 +109,67 @@
       </c:forEach>
       <c:if test="${empty orders}">
         <div style="color:#94a3b8;">暂无维修记录。</div>
+      </c:if>
+    </div>
+
+    <div class="rule-form" style="margin-top:24px;">
+      <div class="rule-form-header">
+        <h2>新增维护计划</h2>
+      </div>
+      <form action="${ctx}/alarm" method="post" class="rule-form-grid">
+        <input type="hidden" name="action" value="createMaintenancePlan"/>
+        <input type="hidden" name="ledgerId" value="${ledger.ledgerId}"/>
+        <div class="form-group">
+          <label>计划类型</label>
+          <input name="planType" placeholder="例如：年度校准 / 周期巡检"/>
+        </div>
+        <div class="form-group">
+          <label>计划日期</label>
+          <input type="date" name="planDate"/>
+        </div>
+        <div class="form-group">
+          <label>负责人</label>
+          <input name="ownerName" placeholder="填写负责人姓名"/>
+        </div>
+        <div class="form-group">
+          <label>计划状态</label>
+          <select name="status">
+            <option value="待执行">待执行</option>
+            <option value="执行中">执行中</option>
+            <option value="已完成">已完成</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1 / -1;">
+          <label>计划内容</label>
+          <textarea name="planContent" rows="3" placeholder="描述维护内容与检查项"></textarea>
+        </div>
+        <div class="form-group" style="display:flex;align-items:flex-end;">
+          <button class="btn btn-primary" type="submit">提交维护计划</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="order-list" style="margin-top:24px;">
+      <div class="order-list-header">
+        <h2>维护计划记录</h2>
+      </div>
+      <c:forEach items="${plans}" var="p">
+        <div class="order-item">
+          <div class="order-item-header">
+            <div class="order-id">计划 #${p.planId}</div>
+            <span class="order-priority">${p.status}</span>
+          </div>
+          <div class="order-details">
+            <div class="order-detail"><strong>计划类型：</strong>${p.planType}</div>
+            <div class="order-detail"><strong>计划日期：</strong>${p.planDate}</div>
+            <div class="order-detail"><strong>负责人：</strong>${p.ownerName}</div>
+            <div class="order-detail"><strong>创建时间：</strong>${p.createdAt}</div>
+          </div>
+          <div style="margin-top:12px;color:#64748b;">${p.planContent}</div>
+        </div>
+      </c:forEach>
+      <c:if test="${empty plans}">
+        <div style="color:#94a3b8;">暂无维护计划记录。</div>
       </c:if>
     </div>
   </c:if>

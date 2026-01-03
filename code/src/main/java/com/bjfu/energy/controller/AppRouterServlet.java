@@ -1,12 +1,16 @@
 package com.bjfu.energy.controller;
 
+import com.bjfu.energy.dao.AnalystDao;
 import com.bjfu.energy.dao.EnergyDao;
+import com.bjfu.energy.dao.ExecDashboardDao;
 import com.bjfu.energy.dao.PvDao;
+import com.bjfu.energy.entity.SysUser;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +24,8 @@ public class AppRouterServlet extends HttpServlet {
 
     private final EnergyDao energyDao = new EnergyDao();
     private final PvDao pvDao = new PvDao();
+    private final ExecDashboardDao execDashboardDao = new ExecDashboardDao();
+    private final AnalystDao analystDao = new AnalystDao();
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
@@ -29,10 +35,39 @@ public class AppRouterServlet extends HttpServlet {
         if (module == null || module.trim().isEmpty()) {
             module = "dashboard";
         }
+        String roleType = null;
+        if (req.getSession(false) != null) {
+            roleType = (String) req.getSession(false).getAttribute("currentRoleType");
+        }
 
         String jsp;
         switch (module) {
             case "dashboard":
+                roleType = getRoleType(req);
+                if ("EXEC".equals(roleType)) {
+                    try {
+                        req.setAttribute("execOverview", execDashboardDao.getMonthlyOverview());
+                        req.setAttribute("execHighAlarms", execDashboardDao.listHighAlarms(6));
+                        req.setAttribute("execDecisionItems", execDashboardDao.listDecisionItems());
+                        req.setAttribute("execMonthlySummaries", execDashboardDao.listEnergySummaries("month"));
+                        req.setAttribute("execQuarterlySummaries", execDashboardDao.listEnergySummaries("quarter"));
+                        req.setAttribute("execProjects", execDashboardDao.listResearchProjects());
+                        req.setAttribute("execOpenProjects", execDashboardDao.listOpenProjects());
+                        applyFlashMessage(req);
+                    } catch (Exception e) {
+                        throw new ServletException("管理层大屏数据加载失败: " + e.getMessage(), e);
+                    }
+                }
+                if ("ENERGY".equals(roleType)) {
+                    try {
+                        req.setAttribute("pendingReviewCount", energyDao.getPendingReviewCount());
+                        req.setAttribute("activePlanCount", energyDao.getActivePlanCount());
+                        req.setAttribute("highConsumptionCount", energyDao.listHighConsumptionAreas().size());
+                    } catch (Exception e) {
+                        throw new ServletException("能源管理员工作台数据加载失败: " + e.getMessage(), e);
+                    }
+                }
+                loadAnalystDashboard(req);
                 jsp = "/WEB-INF/jsp/dashboard/dashboard.jsp";
                 break;
             case "dist":
@@ -142,6 +177,41 @@ public class AppRouterServlet extends HttpServlet {
                             req.setAttribute("reportItems", energyDao.listPeakValleySummary(null, null));
                             jsp = "/WEB-INF/jsp/energy/peak_valley_report.jsp";
                             break;
+                        case "report_overview":
+                            Long reportFactoryId = parseLong(req.getParameter("factoryId"));
+                            String reportEnergyType = req.getParameter("energyType");
+                            req.setAttribute("factories", energyDao.listFactories());
+                            req.setAttribute("selectedFactoryId", reportFactoryId);
+                            req.setAttribute("selectedEnergyType", reportEnergyType);
+                            req.setAttribute("monthlyStats", energyDao.getLatestMonthlyReportStats());
+                            req.setAttribute("monthlyReports", energyDao.listMonthlyEnergyReports(reportFactoryId, reportEnergyType));
+                            jsp = "/WEB-INF/jsp/energy/energy_report_overview.jsp";
+                            break;
+                        case "data_review":
+                            Long reviewFactoryId = parseLong(req.getParameter("factoryId"));
+                            String reviewEnergyType = req.getParameter("energyType");
+                            String quality = req.getParameter("quality");
+                            req.setAttribute("factories", energyDao.listFactories());
+                            req.setAttribute("selectedFactoryId", reviewFactoryId);
+                            req.setAttribute("selectedEnergyType", reviewEnergyType);
+                            req.setAttribute("selectedQuality", quality);
+                            req.setAttribute("reviewStats", energyDao.getQualityReviewStats(reviewFactoryId, reviewEnergyType, quality));
+                            req.setAttribute("reviewRecords", energyDao.listQualityIssueRecords(reviewFactoryId, reviewEnergyType, quality));
+                            jsp = "/WEB-INF/jsp/energy/energy_data_review.jsp";
+                            break;
+                        case "optimization_plan":
+                            req.setAttribute("factories", energyDao.listFactories());
+                            req.setAttribute("planStats", energyDao.getOptimizationStats());
+                            req.setAttribute("plans", energyDao.listOptimizationPlans());
+                            jsp = "/WEB-INF/jsp/energy/energy_optimization_plan.jsp";
+                            break;
+                        case "investigation_list":
+                            req.setAttribute("factories", energyDao.listFactories());
+                            req.setAttribute("investigationStats", energyDao.getInvestigationStats());
+                            req.setAttribute("highConsumptionAreas", energyDao.listHighConsumptionAreas());
+                            req.setAttribute("investigations", energyDao.listInvestigations());
+                            jsp = "/WEB-INF/jsp/energy/energy_investigation_list.jsp";
+                            break;
                         case "meter_list":
                         default:
                             String energyType = req.getParameter("energyType");
@@ -179,7 +249,71 @@ public class AppRouterServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
-        doGet(req, resp);
+        String module = req.getParameter("module");
+        if ("dashboard".equals(module) && "EXEC".equals(getRoleType(req))) {
+            String action = req.getParameter("action");
+            try {
+                if ("decisionUpdate".equals(action)) {
+                    Long decisionId = parseLong(req.getParameter("decisionId"));
+                    String status = req.getParameter("status");
+                    if (decisionId != null && status != null && !status.trim().isEmpty()) {
+                        execDashboardDao.updateDecisionStatus(decisionId, status.trim());
+                        setFlashMessage(req, "success", "决策状态已更新");
+                    } else {
+                        setFlashMessage(req, "warning", "请选择有效的决策项与状态");
+                    }
+                } else if ("projectApply".equals(action)) {
+                    String title = req.getParameter("projectTitle");
+                    String summary = req.getParameter("projectSummary");
+                    String applicant = getCurrentUserName(req);
+                    if (title != null && !title.trim().isEmpty()) {
+                        execDashboardDao.createResearchProject(title.trim(), summary, applicant);
+                        setFlashMessage(req, "success", "科研项目申请已提交");
+                    } else {
+                        setFlashMessage(req, "warning", "请填写科研项目名称");
+                    }
+                } else if ("projectClose".equals(action)) {
+                    Long projectId = parseLong(req.getParameter("projectId"));
+                    String closeReport = req.getParameter("closeReport");
+                    if (projectId != null && closeReport != null && !closeReport.trim().isEmpty()) {
+                        execDashboardDao.submitResearchClosure(projectId, closeReport.trim());
+                        setFlashMessage(req, "success", "科研项目结题报告已提交");
+                    } else {
+                        setFlashMessage(req, "warning", "请选择项目并填写结题报告");
+                    }
+                }
+                resp.sendRedirect(req.getContextPath() + "/app?module=dashboard");
+                return;
+            } catch (Exception e) {
+                throw new ServletException("管理层操作处理失败: " + e.getMessage(), e);
+            }
+        }
+        if (!"energy".equals(module)) {
+            doGet(req, resp);
+            return;
+        }
+        String action = req.getParameter("action");
+        if (action == null || action.trim().isEmpty()) {
+            doGet(req, resp);
+            return;
+        }
+        try {
+            switch (action) {
+                case "review_data":
+                    handleReviewData(req, resp);
+                    return;
+                case "create_plan":
+                    handleCreatePlan(req, resp);
+                    return;
+                case "create_investigation":
+                    handleCreateInvestigation(req, resp);
+                    return;
+                default:
+                    doGet(req, resp);
+            }
+        } catch (Exception e) {
+            throw new ServletException("能源管理员操作失败: " + e.getMessage(), e);
+        }
     }
 
     private Long parseLong(String value) {
@@ -191,5 +325,195 @@ public class AppRouterServlet extends HttpServlet {
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    private String getRoleType(HttpServletRequest req) {
+        HttpSession session = req.getSession(false);
+        if (session == null) {
+            return null;
+        }
+        Object roleType = session.getAttribute("currentRoleType");
+        return roleType == null ? null : roleType.toString();
+    }
+
+    private String getCurrentUserName(HttpServletRequest req) {
+        HttpSession session = req.getSession(false);
+        if (session == null) {
+            return "管理层";
+        }
+        SysUser user = (SysUser) session.getAttribute("currentUser");
+        if (user == null || user.getRealName() == null || user.getRealName().trim().isEmpty()) {
+            return "管理层";
+        }
+        return user.getRealName().trim();
+    }
+
+    private void setFlashMessage(HttpServletRequest req, String type, String message) {
+        HttpSession session = req.getSession(false);
+        if (session != null) {
+            session.setAttribute("execFlashType", type);
+            session.setAttribute("execFlashMessage", message);
+        }
+    }
+
+    private void applyFlashMessage(HttpServletRequest req) {
+        HttpSession session = req.getSession(false);
+        if (session == null) {
+            return;
+        }
+        Object message = session.getAttribute("execFlashMessage");
+        Object type = session.getAttribute("execFlashType");
+        if (message != null) {
+            req.setAttribute("execFlashMessage", message);
+            req.setAttribute("execFlashType", type == null ? "info" : type);
+            session.removeAttribute("execFlashMessage");
+            session.removeAttribute("execFlashType");}
+        }
+    private void handleReviewData(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+        Long dataId = parseLong(req.getParameter("dataId"));
+        String reviewStatus = req.getParameter("reviewStatus");
+        String reviewRemark = req.getParameter("reviewRemark");
+        String reviewer = "系统";
+        if (req.getSession(false) != null && req.getSession(false).getAttribute("currentUser") != null) {
+            com.bjfu.energy.entity.SysUser user =
+                    (com.bjfu.energy.entity.SysUser) req.getSession(false).getAttribute("currentUser");
+            reviewer = user.getRealName() != null ? user.getRealName() : user.getLoginAccount();
+        }
+        if (dataId == null || reviewStatus == null || reviewStatus.trim().isEmpty()) {
+            resp.sendRedirect(req.getContextPath() + "/app?module=energy&view=data_review&error=missing");
+            return;
+        }
+        energyDao.upsertEnergyDataReview(dataId, reviewStatus.trim(), reviewer, reviewRemark);
+        resp.sendRedirect(req.getContextPath() + "/app?module=energy&view=data_review&success=review");
+    }
+
+    private void handleCreatePlan(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+        Long factoryId = parseLong(req.getParameter("factoryId"));
+        String energyType = req.getParameter("energyType");
+        String planTitle = req.getParameter("planTitle");
+        String planAction = req.getParameter("planAction");
+        String startDate = req.getParameter("startDate");
+        String targetReduction = req.getParameter("targetReduction");
+        String owner = "能源管理员";
+        if (req.getSession(false) != null && req.getSession(false).getAttribute("currentUser") != null) {
+            com.bjfu.energy.entity.SysUser user =
+                    (com.bjfu.energy.entity.SysUser) req.getSession(false).getAttribute("currentUser");
+            owner = user.getRealName() != null ? user.getRealName() : user.getLoginAccount();
+        }
+        if (factoryId == null || energyType == null || energyType.trim().isEmpty()
+                || planTitle == null || planTitle.trim().isEmpty()
+                || planAction == null || planAction.trim().isEmpty()
+                || startDate == null || startDate.trim().isEmpty()) {
+            resp.sendRedirect(req.getContextPath() + "/app?module=energy&view=optimization_plan&error=missing");
+            return;
+        }
+        java.sql.Date date = java.sql.Date.valueOf(startDate);
+        java.math.BigDecimal target = targetReduction == null || targetReduction.trim().isEmpty()
+                ? java.math.BigDecimal.ZERO
+                : new java.math.BigDecimal(targetReduction.trim());
+        energyDao.createOptimizationPlan(factoryId, energyType, planTitle.trim(), planAction.trim(), date, target, owner);
+        resp.sendRedirect(req.getContextPath() + "/app?module=energy&view=optimization_plan&success=plan");
+    }
+
+    private void handleCreateInvestigation(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+        Long factoryId = parseLong(req.getParameter("factoryId"));
+        String energyType = req.getParameter("energyType");
+        String level = req.getParameter("level");
+        String issueDesc = req.getParameter("issueDesc");
+        String owner = "能源管理员";
+        if (req.getSession(false) != null && req.getSession(false).getAttribute("currentUser") != null) {
+            com.bjfu.energy.entity.SysUser user =
+                    (com.bjfu.energy.entity.SysUser) req.getSession(false).getAttribute("currentUser");
+            owner = user.getRealName() != null ? user.getRealName() : user.getLoginAccount();
+        }
+        if (factoryId == null || energyType == null || energyType.trim().isEmpty()
+                || issueDesc == null || issueDesc.trim().isEmpty()) {
+            resp.sendRedirect(req.getContextPath() + "/app?module=energy&view=investigation_list&error=missing");
+            return;
+        }
+        String levelValue = (level == null || level.trim().isEmpty()) ? "重点排查" : level.trim();
+        energyDao.createInvestigation(factoryId, energyType, levelValue, issueDesc.trim(), owner);
+        resp.sendRedirect(req.getContextPath() + "/app?module=energy&view=investigation_list&success=investigation");}
+    private void loadAnalystDashboard(HttpServletRequest req) throws ServletException {
+        HttpSession session = req.getSession(false);
+        String roleType = session == null ? null : (String) session.getAttribute("currentRoleType");
+        if (!"ANALYST".equals(roleType)) {
+            return;
+        }
+        try {
+            int windowDays = 90;
+            Map<String, Object> overview = analystDao.getForecastOverview(windowDays);
+            Double lastWeekDeviation = analystDao.getAvgDeviationRate(7, 0);
+            Double prevWeekDeviation = analystDao.getAvgDeviationRate(14, 7);
+            String deviationTrend = buildDeviationTrend(lastWeekDeviation, prevWeekDeviation);
+            int weatherCount = analystDao.countWeatherFactors(30);
+
+            List<Map<String, Object>> forecastInsights = analystDao.listForecastDeviationInsights(6);
+            List<Map<String, Object>> energyInsights = analystDao.listEnergyLineInsights(4);
+            List<Map<String, Object>> reportItems = analystDao.listQuarterlyEnergyReports(4);
+            List<Map<String, Object>> modelAlerts = analystDao.listModelAlerts(2);
+
+            overview.put("dataWindowLabel", "近" + windowDays + "天");
+            overview.put("deviationTrend", deviationTrend);
+            overview.put("weatherHint", weatherCount > 0 ? "引入天气因子" : "待接入天气因子");
+            overview.put("correlationTaskCount", energyInsights.size());
+            overview.put("reportCount", reportItems.size());
+            overview.put("pendingReportCount", countPendingReports(reportItems));
+
+            req.setAttribute("analystOverview", overview);
+            req.setAttribute("forecastInsights", forecastInsights);
+            req.setAttribute("energyInsights", energyInsights);
+            req.setAttribute("reportItems", reportItems);
+            req.setAttribute("modelOptimizations", buildModelOptimizations(weatherCount, modelAlerts));
+        } catch (Exception e) {
+            throw new ServletException("数据分析师工作台数据加载失败: " + e.getMessage(), e);
+        }
+    }
+
+    private String buildDeviationTrend(Double lastWeekDeviation, Double prevWeekDeviation) {
+        if (lastWeekDeviation == null || prevWeekDeviation == null) {
+            return "暂无对比数据";
+        }
+        double delta = lastWeekDeviation - prevWeekDeviation;
+        String arrow = delta <= 0 ? "▼" : "▲";
+        String state = delta <= 0 ? "优化后" : "需关注";
+        return String.format("%s %.2f%% %s", arrow, Math.abs(delta), state);
+    }
+
+    private int countPendingReports(List<Map<String, Object>> reportItems) {
+        int count = 0;
+        for (Map<String, Object> item : reportItems) {
+            Object status = item.get("reportStatus");
+            if (status != null && !"表现良好".equals(status.toString())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private List<Map<String, Object>> buildModelOptimizations(int weatherCount, List<Map<String, Object>> alerts) {
+        List<Map<String, Object>> items = new java.util.ArrayList<>();
+        Map<String, Object> weather = new java.util.HashMap<>();
+        weather.put("title", "天气因子融合");
+        weather.put("desc", weatherCount > 0 ? "已完成特征工程" : "等待天气数据接入");
+        weather.put("status", weatherCount > 0 ? "已上线" : "待接入");
+        items.add(weather);
+
+        for (Map<String, Object> alert : alerts) {
+            Map<String, Object> item = new java.util.HashMap<>();
+            item.put("title", "模型告警 - " + alert.get("pointName"));
+            item.put("desc", alert.get("remark") == null ? "偏差超阈值，需复盘模型" : alert.get("remark"));
+            item.put("status", alert.get("processStatus") == null ? "待处理" : alert.get("processStatus"));
+            items.add(item);
+        }
+
+        if (alerts.isEmpty()) {
+            Map<String, Object> fallback = new java.util.HashMap<>();
+            fallback.put("title", "辐照度校准");
+            fallback.put("desc", "等待外部数据比对");
+            fallback.put("status", "排队中");
+            items.add(fallback);
+        }
+        return items;
     }
 }

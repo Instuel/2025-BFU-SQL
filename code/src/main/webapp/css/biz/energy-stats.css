@@ -211,6 +211,49 @@
 }
 
 /* ======================= */
+/* 能源管理员表单组件      */
+/* ======================= */
+
+.energy-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.energy-form-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.energy-form-item label {
+    font-size: 13px;
+    color: #475569;
+    font-weight: 600;
+}
+
+.energy-form-actions {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-start;
+}
+
+.inline-form {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.inline-form .energy-filter-select.compact,
+.inline-form .energy-date-input.compact {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-width: 110px;
+}
+
+/* ======================= */
 /* 能耗报告页面           */
 /* ======================= */
 

@@ -2,16 +2,23 @@ package com.bjfu.energy.controller;
 
 import com.bjfu.energy.entity.AlarmInfo;
 import com.bjfu.energy.entity.DeviceLedger;
+import com.bjfu.energy.entity.MaintenancePlan;
 import com.bjfu.energy.entity.WorkOrder;
 import com.bjfu.energy.service.AlarmService;
 
 import javax.servlet.ServletException;
+import javax.servlet.annotation.MultipartConfig;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.Part;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -25,7 +32,9 @@ import java.util.List;
  *  /alarm?action=workorderDetail&id=1
  *  /alarm?action=ledgerList
  *  /alarm?action=ledgerDetail&id=1
+ *  /alarm?action=maintenancePlanList
  */
+@MultipartConfig
 public class AlarmServlet extends HttpServlet {
 
     private final AlarmService alarmService = new AlarmService();
@@ -61,6 +70,9 @@ public class AlarmServlet extends HttpServlet {
                 case "ledgerDetail":
                     handleLedgerDetail(req, resp);
                     break;
+                case "maintenancePlanList":
+                    handleMaintenancePlanList(req, resp);
+                    break;
                 default:
                     resp.sendError(HttpServletResponse.SC_NOT_FOUND);
                     break;
@@ -85,11 +97,20 @@ public class AlarmServlet extends HttpServlet {
                 case "updateAlarmStatus":
                     handleUpdateAlarmStatus(req, resp);
                     break;
+                case "updateAlarmVerify":
+                    handleUpdateAlarmVerify(req, resp);
+                    break;
                 case "createWorkOrder":
                     handleCreateWorkOrder(req, resp);
                     break;
                 case "updateWorkOrder":
                     handleUpdateWorkOrder(req, resp);
+                    break;
+                case "createMaintenancePlan":
+                    handleCreateMaintenancePlan(req, resp);
+                    break;
+                case "redispatchWorkOrder":
+                    handleRedispatchWorkOrder(req, resp);
                     break;
                 default:
                     resp.sendError(HttpServletResponse.SC_NOT_FOUND);
@@ -105,7 +126,8 @@ public class AlarmServlet extends HttpServlet {
         String alarmType = req.getParameter("alarmType");
         String alarmLevel = req.getParameter("alarmLevel");
         String processStatus = req.getParameter("processStatus");
-        List<AlarmInfo> alarms = alarmService.listAlarms(alarmType, alarmLevel, processStatus);
+        String verifyStatus = req.getParameter("verifyStatus");
+        List<AlarmInfo> alarms = alarmService.listAlarms(alarmType, alarmLevel, processStatus, verifyStatus);
 
         int total = alarms.size();
         int highCount = 0;
@@ -113,6 +135,8 @@ public class AlarmServlet extends HttpServlet {
         int processingCount = 0;
         int closedCount = 0;
         int overdueCount = 0;
+        int verifyPendingCount = 0;
+        int falseAlarmCount = 0;
         for (AlarmInfo alarm : alarms) {
             if ("高".equals(alarm.getAlarmLevel())) {
                 highCount++;
@@ -127,12 +151,18 @@ public class AlarmServlet extends HttpServlet {
             if (alarm.isDispatchOverdue()) {
                 overdueCount++;
             }
+            if (alarm.getVerifyStatus() == null || "待审核".equals(alarm.getVerifyStatus())) {
+                verifyPendingCount++;
+            } else if ("误报".equals(alarm.getVerifyStatus())) {
+                falseAlarmCount++;
+            }
         }
 
         req.setAttribute("alarms", alarms);
         req.setAttribute("alarmType", alarmType);
         req.setAttribute("alarmLevel", alarmLevel);
         req.setAttribute("processStatus", processStatus);
+        req.setAttribute("verifyStatus", verifyStatus);
         req.setAttribute("message", req.getParameter("message"));
         req.setAttribute("alarmTab", "alarm");
         req.setAttribute("totalCount", total);
@@ -141,6 +171,8 @@ public class AlarmServlet extends HttpServlet {
         req.setAttribute("processingCount", processingCount);
         req.setAttribute("closedCount", closedCount);
         req.setAttribute("overdueCount", overdueCount);
+        req.setAttribute("verifyPendingCount", verifyPendingCount);
+        req.setAttribute("falseAlarmCount", falseAlarmCount);
         req.getRequestDispatcher("/WEB-INF/jsp/alarm/alarm_list.jsp").forward(req, resp);
     }
 
@@ -169,6 +201,7 @@ public class AlarmServlet extends HttpServlet {
         int pending = 0;
         int processing = 0;
         int completed = 0;
+        int overdue = 0;
         for (WorkOrder order : orders) {
             if (order.getResponseTime() == null) {
                 pending++;
@@ -176,6 +209,9 @@ public class AlarmServlet extends HttpServlet {
                 processing++;
             } else {
                 completed++;
+            }
+            if (order.isResponseOverdue()) {
+                overdue++;
             }
         }
 
@@ -187,6 +223,7 @@ public class AlarmServlet extends HttpServlet {
         req.setAttribute("orderPending", pending);
         req.setAttribute("orderProcessing", processing);
         req.setAttribute("orderCompleted", completed);
+        req.setAttribute("orderOverdue", overdue);
         req.getRequestDispatcher("/WEB-INF/jsp/alarm/workorder_list.jsp").forward(req, resp);
     }
 
@@ -240,12 +277,28 @@ public class AlarmServlet extends HttpServlet {
         Long ledgerId = Long.valueOf(idStr);
         DeviceLedger ledger = alarmService.getLedger(ledgerId);
         List<WorkOrder> orders = alarmService.listWorkOrdersForLedger(ledgerId);
+        List<MaintenancePlan> plans = alarmService.listMaintenancePlansForLedger(ledgerId);
 
         req.setAttribute("ledger", ledger);
         req.setAttribute("orders", orders);
+        req.setAttribute("plans", plans);
         req.setAttribute("message", req.getParameter("message"));
         req.setAttribute("alarmTab", "ledger");
         req.getRequestDispatcher("/WEB-INF/jsp/alarm/ledger_detail.jsp").forward(req, resp);
+    }
+
+    private void handleMaintenancePlanList(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception, IOException, ServletException {
+        String deviceType = req.getParameter("deviceType");
+        String status = req.getParameter("status");
+        List<MaintenancePlan> plans = alarmService.listMaintenancePlans(deviceType, status);
+
+        req.setAttribute("plans", plans);
+        req.setAttribute("deviceType", deviceType);
+        req.setAttribute("status", status);
+        req.setAttribute("message", req.getParameter("message"));
+        req.setAttribute("alarmTab", "plan");
+        req.getRequestDispatcher("/WEB-INF/jsp/alarm/maintenance_plan_list.jsp").forward(req, resp);
     }
 
     private void handleUpdateAlarmStatus(HttpServletRequest req, HttpServletResponse resp)
@@ -257,16 +310,39 @@ public class AlarmServlet extends HttpServlet {
         resp.sendRedirect(buildRedirect(target, "处理状态已更新"));
     }
 
+    private void handleUpdateAlarmVerify(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception, IOException {
+        Long alarmId = Long.valueOf(req.getParameter("alarmId"));
+        String verifyStatus = req.getParameter("verifyStatus");
+        String verifyRemark = req.getParameter("verifyRemark");
+        alarmService.updateAlarmVerification(alarmId, verifyStatus, verifyRemark);
+        String target = req.getContextPath() + "/alarm?action=detail&id=" + alarmId + "&module=alarm";
+        resp.sendRedirect(buildRedirect(target, "告警真实性已更新"));
+    }
+
     private void handleCreateWorkOrder(HttpServletRequest req, HttpServletResponse resp)
             throws Exception, IOException {
+        Long alarmId = Long.valueOf(req.getParameter("alarmId"));
+        AlarmInfo alarm = alarmService.getAlarm(alarmId);
+        if (alarm == null) {
+            String target = req.getContextPath() + "/alarm?action=list&module=alarm";
+            resp.sendRedirect(buildRedirect(target, "未找到对应告警"));
+            return;
+        }
+        if (!"有效".equals(alarm.getVerifyStatus())) {
+            String target = req.getContextPath() + "/alarm?action=detail&id=" + alarmId + "&module=alarm";
+            resp.sendRedirect(buildRedirect(target, "请先完成告警真实性审核"));
+            return;
+        }
         WorkOrder order = new WorkOrder();
-        order.setAlarmId(Long.valueOf(req.getParameter("alarmId")));
+        order.setAlarmId(alarmId);
         order.setLedgerId(parseLong(req.getParameter("ledgerId")));
         order.setOandmId(parseLong(req.getParameter("oandmId")));
         order.setDispatchTime(parseDateTime(req.getParameter("dispatchTime")));
         order.setResultDesc(req.getParameter("resultDesc"));
         order.setReviewStatus(req.getParameter("reviewStatus"));
-        order.setAttachmentPath(req.getParameter("attachmentPath"));
+        String attachmentPath = handleAttachmentUpload(req, req.getParameter("attachmentPath"));
+        order.setAttachmentPath(attachmentPath);
 
         Long id = alarmService.createWorkOrder(order);
         String target = req.getContextPath() + "/alarm?action=workorderDetail&id=" + id + "&module=alarm";
@@ -285,11 +361,36 @@ public class AlarmServlet extends HttpServlet {
         order.setFinishTime(parseDateTime(req.getParameter("finishTime")));
         order.setResultDesc(req.getParameter("resultDesc"));
         order.setReviewStatus(req.getParameter("reviewStatus"));
-        order.setAttachmentPath(req.getParameter("attachmentPath"));
+        String attachmentPath = handleAttachmentUpload(req, req.getParameter("attachmentPath"));
+        order.setAttachmentPath(attachmentPath);
 
         alarmService.updateWorkOrder(order);
         String target = req.getContextPath() + "/alarm?action=workorderDetail&id=" + order.getOrderId() + "&module=alarm";
         resp.sendRedirect(buildRedirect(target, "工单信息已更新"));
+    }
+
+    private void handleCreateMaintenancePlan(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception, IOException {
+        MaintenancePlan plan = new MaintenancePlan();
+        plan.setLedgerId(parseLong(req.getParameter("ledgerId")));
+        plan.setPlanType(req.getParameter("planType"));
+        plan.setPlanContent(req.getParameter("planContent"));
+        plan.setPlanDate(parseDate(req.getParameter("planDate")));
+        plan.setOwnerName(req.getParameter("ownerName"));
+        plan.setStatus(req.getParameter("status"));
+
+        Long id = alarmService.createMaintenancePlan(plan);
+        String target = req.getContextPath() + "/alarm?action=ledgerDetail&id=" + plan.getLedgerId() + "&module=alarm";
+        resp.sendRedirect(buildRedirect(target, "维护计划已创建（编号：" + id + "）"));}
+    private void handleRedispatchWorkOrder(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception, IOException {
+        Long orderId = Long.valueOf(req.getParameter("orderId"));
+        Long oandmId = parseLong(req.getParameter("oandmId"));
+        LocalDateTime dispatchTime = parseDateTime(req.getParameter("dispatchTime"));
+        String reason = req.getParameter("redispatchReason");
+        alarmService.redispatchWorkOrder(orderId, oandmId, dispatchTime, reason);
+        String target = req.getContextPath() + "/alarm?action=workorderDetail&id=" + orderId + "&module=alarm";
+        resp.sendRedirect(buildRedirect(target, "工单已重新派单"));
     }
 
     private LocalDateTime parseDateTime(String value) {
@@ -309,6 +410,43 @@ public class AlarmServlet extends HttpServlet {
             return null;
         }
         return Long.valueOf(value.trim());
+    }
+
+    private LocalDate parseDate(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value.trim());
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+    }
+
+    private String handleAttachmentUpload(HttpServletRequest req, String fallbackPath)
+            throws IOException, ServletException {
+        Part part = req.getPart("attachmentFile");
+        if (part == null || part.getSize() == 0) {
+            return fallbackPath;
+        }
+        String submittedFileName = part.getSubmittedFileName();
+        if (submittedFileName == null || submittedFileName.trim().isEmpty()) {
+            return fallbackPath;
+        }
+        String safeName = Paths.get(submittedFileName).getFileName().toString();
+        String fileName = "workorder_" + System.currentTimeMillis() + "_" + safeName;
+        String basePath = req.getServletContext().getRealPath("/uploads/workorder");
+        Path uploadDir = basePath == null
+                ? Paths.get(System.getProperty("java.io.tmpdir"), "energy_uploads", "workorder")
+                : Paths.get(basePath);
+        Files.createDirectories(uploadDir);
+        Path target = uploadDir.resolve(fileName);
+        try {
+            Files.copy(part.getInputStream(), target);
+        } catch (IOException ex) {
+            return fallbackPath;
+        }
+        return "/uploads/workorder/" + fileName;
     }
 
     private String buildRedirect(String target, String message) {
