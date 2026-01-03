@@ -72,7 +72,7 @@ CREATE TABLE Role_Manager (
     CONSTRAINT FK_Manager_User FOREIGN KEY (User_ID) REFERENCES Sys_User(User_ID)
 );
 
--- 2.6 运维工单人员 (调度员)
+-- 2.6 运维工单人员
 CREATE TABLE Role_Dispatcher (
     Dispatcher_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     User_ID BIGINT NOT NULL,
@@ -83,13 +83,13 @@ CREATE TABLE Role_Dispatcher (
 CREATE TABLE Sys_Role_Assignment (
     Assignment_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     User_ID BIGINT NOT NULL,
-    Role_Type NVARCHAR(20) NOT NULL, -- ADMIN, OM, ENERGY, ANALYST, EXEC
+    Role_Type NVARCHAR(20) NOT NULL, -- ADMIN, OM, ENERGY, ANALYST, EXEC, DEISPATCHER
     Assigned_By BIGINT NULL, -- 系统管理员ID
     Assigned_Time DATETIME2(0) DEFAULT SYSDATETIME(),
 
     CONSTRAINT FK_Assignment_User FOREIGN KEY (User_ID) REFERENCES Sys_User(User_ID),
     CONSTRAINT FK_Assignment_Admin FOREIGN KEY (Assigned_By) REFERENCES Role_SysAdmin(Admin_ID),
-    CONSTRAINT CK_Role_Type CHECK (Role_Type IN ('ADMIN','OM','ENERGY','ANALYST','EXEC'))
+    CONSTRAINT CK_Role_Type CHECK (Role_Type IN ('ADMIN','OM','ENERGY','ANALYST','EXEC', 'DEISPATCHER'))
 );
 
 
@@ -132,7 +132,7 @@ CREATE TABLE Dist_Room (
     Location NVARCHAR(100),
     Voltage_Level NVARCHAR(10),
     Manager_User_ID BIGINT,
-    Factory_ID BIGINT, -- 补充厂区外键以支持查询优化
+    Factory_ID BIGINT, -- 厂区外键以支持查询优化
 
     CONSTRAINT FK_Room_Manager FOREIGN KEY (Manager_User_ID) REFERENCES Sys_User(User_ID),
     CONSTRAINT FK_Room_Factory FOREIGN KEY (Factory_ID) REFERENCES Base_Factory(Factory_ID)
@@ -360,6 +360,7 @@ CREATE TABLE Work_Order (
     Order_ID BIGINT IDENTITY(1,1) PRIMARY KEY,
     Alarm_ID BIGINT NOT NULL,
     OandM_ID BIGINT NOT NULL, -- 运维人员
+    Dispatcher_ID BIGINT NOT NULL, --运维工单管理员
     Ledger_ID BIGINT,         -- 维修设备
     Dispatch_Time DATETIME2(0),
     Response_Time DATETIME2(0),
