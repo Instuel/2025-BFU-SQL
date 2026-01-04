@@ -774,8 +774,8 @@ INSERT INTO Sys_Role_Permission (Role_Type, Perm_Code) VALUES
 -- 运维工单管理人员
 INSERT INTO Sys_Role_Permission (Role_Type, Perm_Code) VALUES
 ('DISPATCHER','MODULE_DASHBOARD'),
-('DISPATCHER','MODULE_DISPATCHER');
-
+('DISPATCHER','MODULE_DISPATCHER'),
+('DISPATCHER','MODULE_ALARM');
 
 /* ======================= 3) 系统管理员功能扩展（已修复角色类型约束） ======================= */
 
@@ -1325,65 +1325,33 @@ GO
      - Verify_Remark：复核备注/退回原因
      - 兼容性：允许 NULL（老数据）并提供默认值
    ============================================================ */
-/* ============================================================
-   ✅ 修复版：Alarm_Info 复核字段（可重复执行/不会叠加冲突约束）
-   统一策略：先清理所有涉及 Verify_Status 的约束，再建立一套最终规则
-   ============================================================ */
-USE SQL_BFU;
-GO
-
--- 1) 补列：Verify_Status / Verify_Remark
-IF COL_LENGTH('dbo.Alarm_Info', 'Verify_Status') IS NULL
+IF COL_LENGTH('Alarm_Info', 'Verify_Status') IS NULL
 BEGIN
-    ALTER TABLE dbo.Alarm_Info ADD Verify_Status NVARCHAR(10) NULL;
+    ALTER TABLE Alarm_Info
+    ADD Verify_Status NVARCHAR(10) NULL
+        CONSTRAINT DF_Alarm_Verify_Status DEFAULT (N'待复核');
 END
 GO
 
-IF COL_LENGTH('dbo.Alarm_Info', 'Verify_Remark') IS NULL
+IF COL_LENGTH('Alarm_Info', 'Verify_Remark') IS NULL
 BEGIN
-    ALTER TABLE dbo.Alarm_Info ADD Verify_Remark NVARCHAR(200) NULL;
+    ALTER TABLE Alarm_Info
+    ADD Verify_Remark NVARCHAR(200) NULL;
 END
 GO
 
--- 2) 清理：删除 Alarm_Info 上所有“涉及 Verify_Status”的 CHECK 约束（不管叫啥名）
-DECLARE @sql NVARCHAR(MAX) = N'';
-
-SELECT @sql += N'ALTER TABLE dbo.Alarm_Info DROP CONSTRAINT ' + QUOTENAME(cc.name) + N';' + CHAR(10)
-FROM sys.check_constraints cc
-WHERE cc.parent_object_id = OBJECT_ID(N'dbo.Alarm_Info')
-  AND cc.definition LIKE N'%Verify_Status%';
-
-IF (@sql <> N'') EXEC sp_executesql @sql;
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.check_constraints
+    WHERE name = 'CK_Alarm_Verify'
+      AND parent_object_id = OBJECT_ID('Alarm_Info')
+)
+BEGIN
+    ALTER TABLE Alarm_Info
+    ADD CONSTRAINT CK_Alarm_Verify
+        CHECK (Verify_Status IN (N'待复核', N'通过', N'未通过') OR Verify_Status IS NULL);
+END
 GO
-
--- 3) 清理：删除 Verify_Status 的默认约束（不管叫啥名）
-DECLARE @sql2 NVARCHAR(MAX) = N'';
-
-SELECT @sql2 += N'ALTER TABLE dbo.Alarm_Info DROP CONSTRAINT ' + QUOTENAME(dc.name) + N';' + CHAR(10)
-FROM sys.default_constraints dc
-JOIN sys.columns c
-  ON c.object_id = dc.parent_object_id
- AND c.column_id = dc.parent_column_id
-WHERE dc.parent_object_id = OBJECT_ID(N'dbo.Alarm_Info')
-  AND c.name = N'Verify_Status';
-
-IF (@sql2 <> N'') EXEC sp_executesql @sql2;
-GO
-
--- 4) 重新建立默认值（与你的填充脚本一致：待复核）
-ALTER TABLE dbo.Alarm_Info
-ADD CONSTRAINT DF_Alarm_Verify_Status DEFAULT (N'待复核') FOR Verify_Status;
-GO
-
--- 5) 建立唯一的 CHECK（兼容两套历史值，避免不同脚本版本互相打架）
-ALTER TABLE dbo.Alarm_Info
-ADD CONSTRAINT CK_Alarm_Verify_Status
-CHECK (
-    Verify_Status IS NULL OR
-    Verify_Status IN (N'待复核', N'通过', N'未通过', N'待审核', N'有效', N'误报')
-);
-GO
-
 /* ============================================================
 告警运维管理业务线补充
 负责人：李振梁
