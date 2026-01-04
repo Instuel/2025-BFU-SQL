@@ -1453,17 +1453,17 @@ PRINT '告警运维业务线 表结构检查与创建成功';
 
    目标数据库：SQL_BFU
    修改内容：
-   1) Data_Transformer（变压器监测数据表）：新增“状态”字段 + CHECK 约束（正常/异常）
-   2) Data_Circuit（回路监测数据表）：新增“状态”字段 + CHECK 约束（正常/异常）
+   1) Dist_Transformer（变压器监测数据表）：新增“状态”字段 + CHECK 约束（正常/异常）
+   2) Dist_Circuit（回路监测数据表）：新增“状态”字段 + CHECK 约束（正常/异常）
    ============================================================ */
 USE SQL_BFU;
 GO
 
 
 -- 检查并新增状态字段（若字段不存在）
-IF COL_LENGTH('Data_Transformer', 'Device_Status') IS NULL
+IF COL_LENGTH('Dist_Transformer', 'Device_Status') IS NULL
 BEGIN
-    ALTER TABLE Data_Transformer
+    ALTER TABLE Dist_Transformer
     ADD Device_Status NVARCHAR(10) NULL; -- 状态：正常/异常
 END
 GO
@@ -1472,21 +1472,21 @@ GO
 IF NOT EXISTS (
     SELECT 1 
     FROM sys.check_constraints 
-    WHERE name = 'CK_DataTrans_Status'
-      AND parent_object_id = OBJECT_ID('Data_Transformer')
+    WHERE name = 'CK_DistTrans_Status'
+      AND parent_object_id = OBJECT_ID('Dist_Transformer')
 )
 BEGIN
-    ALTER TABLE Data_Transformer
-    ADD CONSTRAINT CK_DataTrans_Status
+    ALTER TABLE Dist_Transformer
+    ADD CONSTRAINT CK_DistTrans_Status
         CHECK (Device_Status IN (N'正常', N'异常') OR Device_Status IS NULL);
 END
 GO
 
 
 -- 3.1 检查并新增状态字段（若字段不存在）
-IF COL_LENGTH('Data_Circuit', 'Device_Status') IS NULL
+IF COL_LENGTH('Dist_Circuit', 'Device_Status') IS NULL
 BEGIN
-    ALTER TABLE Data_Circuit
+    ALTER TABLE Dist_Circuit
     ADD Device_Status NVARCHAR(10) NULL; -- 状态：正常/异常
 END
 GO
@@ -1495,12 +1495,12 @@ GO
 IF NOT EXISTS (
     SELECT 1 
     FROM sys.check_constraints 
-    WHERE name = 'CK_DataCircuit_Status'
-      AND parent_object_id = OBJECT_ID('Data_Circuit')
+    WHERE name = 'CK_DistCircuit_Status'
+      AND parent_object_id = OBJECT_ID('Dist_Circuit')
 )
 BEGIN
-    ALTER TABLE Data_Circuit
-    ADD CONSTRAINT CK_DataCircuit_Status
+    ALTER TABLE Dist_Circuit
+    ADD CONSTRAINT CK_DistCircuit_Status
         CHECK (Device_Status IN (N'正常', N'异常') OR Device_Status IS NULL);
 END
 GO
@@ -1718,7 +1718,7 @@ UNION ALL
 SELECT 
     '04-配电网管理', 
     '张恺洋', 
-    'Data_Transformer, Data_Circuit, Base_Factory', 
+    'Dist_Transformer, Dist_Circuit, Base_Factory', 
     '增加设备状态字段及约束; 修复工厂外键关联; 规范峰谷类型约束'
 UNION ALL
 SELECT 

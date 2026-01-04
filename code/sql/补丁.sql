@@ -241,41 +241,86 @@ BEGIN
 END
 GO
 
--- 4) 默认值：新告警默认“待审核”
-IF NOT EXISTS (
-    SELECT 1
-    FROM sys.default_constraints dc
-    JOIN sys.columns c ON c.default_object_id = dc.object_id
-    WHERE dc.parent_object_id = OBJECT_ID('dbo.Alarm_Info')
-      AND c.name = 'Verify_Status'
+USE SQL_BFU;
+GO
+
+SET NOCOUNT ON;
+
+PRINT '正在执行：告警管理业务线约束与数据修正...';
+
+/* ============================================================
+   Step 1: 暴力清理旧约束 (防止改名或重复导致的报错)
+   我们先查出所有绑定在 Verify_Status 上的约束并删除
+   ============================================================ */
+DECLARE @ConstraintName NVARCHAR(200);
+DECLARE @TableName NVARCHAR(50) = 'dbo.Alarm_Info';
+DECLARE @ColName NVARCHAR(50) = 'Verify_Status';
+
+-- 1.1 清理默认值约束 (不管它叫什么名字)
+SELECT @ConstraintName = dc.name
+FROM sys.default_constraints dc
+JOIN sys.columns c ON dc.parent_column_id = c.column_id AND dc.parent_object_id = c.object_id
+WHERE dc.parent_object_id = OBJECT_ID(@TableName) 
+  AND c.name = @ColName;
+
+IF @ConstraintName IS NOT NULL
+BEGIN
+    EXEC('ALTER TABLE ' + @TableName + ' DROP CONSTRAINT ' + @ConstraintName);
+    PRINT '  - 已删除旧默认值约束: ' + @ConstraintName;
+END
+
+-- 1.2 清理 CHECK 约束 (清理所有可能的旧名字)
+-- 我们循环删除，直到删干净为止（防止表上同时挂了新旧两个约束）
+WHILE EXISTS (
+    SELECT 1 FROM sys.check_constraints 
+    WHERE parent_object_id = OBJECT_ID(@TableName) 
+      AND (name = 'CK_Alarm_Verify' OR name = 'CK_Alarm_Verify_Status') -- 覆盖新旧两个名字
 )
 BEGIN
-    ALTER TABLE dbo.Alarm_Info
-    ADD CONSTRAINT DF_Alarm_Info_Verify_Status DEFAULT (N'待审核') FOR Verify_Status;
+    SELECT TOP 1 @ConstraintName = name 
+    FROM sys.check_constraints 
+    WHERE parent_object_id = OBJECT_ID(@TableName) 
+      AND (name = 'CK_Alarm_Verify' OR name = 'CK_Alarm_Verify_Status');
+      
+    EXEC('ALTER TABLE ' + @TableName + ' DROP CONSTRAINT ' + @ConstraintName);
+    PRINT '  - 已删除旧 CHECK 约束: ' + @ConstraintName;
 END
 GO
 
--- 5) CHECK 约束（可选，但建议加，避免乱写）
-IF NOT EXISTS (
-    SELECT 1
-    FROM sys.check_constraints
-    WHERE name = 'CK_Alarm_Verify_Status'
-      AND parent_object_id = OBJECT_ID('dbo.Alarm_Info')
-)
-BEGIN
-    ALTER TABLE dbo.Alarm_Info
-    ADD CONSTRAINT CK_Alarm_Verify_Status
-    CHECK (Verify_Status IN (N'待审核', N'有效', N'误报') OR Verify_Status IS NULL);
-END
-GO
+/* ============================================================
+   Step 2: 旧数据兜底 (防止脏数据导致新约束创建失败)
+   必须在创建 CHECK 约束之前执行！
+   ============================================================ */
+-- 临时禁用触发器，防止批量更新时触发工单同步逻辑
+DISABLE TRIGGER ALL ON dbo.Alarm_Info;
 
--- 6) 旧数据兜底：空值统一置为“待审核”（匹配你页面统计逻辑）
 UPDATE dbo.Alarm_Info
 SET Verify_Status = N'待审核'
-WHERE Verify_Status IS NULL OR LTRIM(RTRIM(Verify_Status)) = N'';
+WHERE Verify_Status IS NULL 
+   OR Verify_Status NOT IN (N'待审核', N'有效', N'误报'); -- 顺便修复不合规的值
+
+PRINT '  - 已修正历史数据的 Verify_Status 为 [待审核] (' + CAST(@@ROWCOUNT AS NVARCHAR(20)) + ' 行受影响)';
+
+ENABLE TRIGGER ALL ON dbo.Alarm_Info;
 GO
 
-PRINT N'告警管理业务线补丁完成。'
+/* ============================================================
+   Step 3: 重建标准约束
+   ============================================================ */
+-- 3.1 添加默认值：新告警默认“待审核”
+ALTER TABLE dbo.Alarm_Info
+ADD CONSTRAINT DF_Alarm_Info_Verify_Status DEFAULT (N'待审核') FOR Verify_Status;
+PRINT '  - 已创建新默认值约束: DF_Alarm_Info_Verify_Status';
+
+-- 3.2 添加 CHECK 约束：限制取值范围
+ALTER TABLE dbo.Alarm_Info WITH CHECK
+ADD CONSTRAINT CK_Alarm_Verify_Status
+CHECK (Verify_Status IN (N'待审核', N'有效', N'误报') OR Verify_Status IS NULL);
+PRINT '  - 已创建新 CHECK 约束: CK_Alarm_Verify_Status';
+GO
+
+PRINT '告警管理业务线补丁执行完成。';
+
 GO
 
 
@@ -484,3 +529,13 @@ GO
 
 PRINT N'配电网业务线补丁完成。'
 GO
+
+SELECT 
+    name AS [约束名],
+    definition AS [约束定义/公式],
+    parent_object_id,
+    OBJECT_NAME(parent_object_id) AS [所属表名]
+FROM 
+    sys.check_constraints
+WHERE 
+    name = 'CK_Alarm_Verify_Status'; -- 这里换成你要查的约束名
