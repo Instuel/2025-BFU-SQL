@@ -55,25 +55,47 @@ public class PvDao {
     }
 
     public List<Map<String, Object>> listDevices() throws Exception {
-        String sql = "SELECT d.Device_ID AS deviceId, " +
-                     "COALESCE(l.Device_Name, CONCAT('PV-', d.Device_ID)) AS deviceCode, " +
-                     "d.Device_Type AS deviceType, d.Capacity AS capacity, d.Run_Status AS runStatus, " +
-                     "d.Protocol AS protocol, p.Point_Name AS pointName, " +
-                     "g.Gen_KWH AS genKwh, g.Grid_KWH AS gridKwh, g.Self_KWH AS selfKwh, " +
-                     "g.Inverter_Eff AS inverterEff, " +
-                     "CONVERT(VARCHAR(16), g.Collect_Time, 120) AS collectTime " +
-                     "FROM PV_Device d " +
-                     "JOIN PV_Grid_Point p ON d.Point_ID = p.Point_ID " +
-                     "LEFT JOIN Device_Ledger l ON d.Ledger_ID = l.Ledger_ID " +
-                     "OUTER APPLY ( " +
-                     "  SELECT TOP 1 Gen_KWH, Grid_KWH, Self_KWH, Inverter_Eff, Collect_Time " +
-                     "  FROM Data_PV_Gen g WHERE g.Device_ID = d.Device_ID " +
-                     "  ORDER BY Collect_Time DESC " +
-                     ") g " +
-                     "ORDER BY d.Device_ID DESC";
+        return listDevices(null, null);
+    }
+
+    public List<Map<String, Object>> listDevices(String sortBy, String sortOrder) throws Exception {
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT d.Device_ID AS deviceId, ")
+           .append("COALESCE(l.Device_Name, CONCAT('PV-', d.Device_ID)) AS deviceCode, ")
+           .append("d.Device_Type AS deviceType, d.Capacity AS capacity, d.Run_Status AS runStatus, ")
+           .append("d.Protocol AS protocol, p.Point_Name AS pointName, ")
+           .append("g.Gen_KWH AS genKwh, g.Grid_KWH AS gridKwh, g.Self_KWH AS selfKwh, ")
+           .append("g.Inverter_Eff AS inverterEff, ")
+           .append("g.Collect_Time AS collectTimeRaw, ")
+           .append("CONVERT(VARCHAR(16), g.Collect_Time, 120) AS collectTime ")
+           .append("FROM PV_Device d ")
+           .append("JOIN PV_Grid_Point p ON d.Point_ID = p.Point_ID ")
+           .append("LEFT JOIN Device_Ledger l ON d.Ledger_ID = l.Ledger_ID ")
+           .append("OUTER APPLY ( ")
+           .append("  SELECT TOP 1 Gen_KWH, Grid_KWH, Self_KWH, Inverter_Eff, Collect_Time ")
+           .append("  FROM Data_PV_Gen g WHERE g.Device_ID = d.Device_ID ")
+           .append("  ORDER BY Collect_Time DESC ")
+           .append(") g ");
+
+        // 排序字段映射
+        String orderColumn = "d.Device_ID";
+        if ("deviceCode".equals(sortBy)) {
+            // 提取设备编号中-后面的数字进行数值排序
+            orderColumn = "CAST(SUBSTRING(COALESCE(l.Device_Name, CONCAT('PV-', d.Device_ID)), CHARINDEX('-', COALESCE(l.Device_Name, CONCAT('PV-', d.Device_ID))) + 1, LEN(COALESCE(l.Device_Name, CONCAT('PV-', d.Device_ID)))) AS INT)";
+        } else if ("collectTime".equals(sortBy)) {
+            orderColumn = "g.Collect_Time";
+        } else if ("capacity".equals(sortBy)) {
+            orderColumn = "d.Capacity";
+        } else if ("deviceType".equals(sortBy)) {
+            orderColumn = "d.Device_Type";
+        }
+
+        String order = "DESC".equalsIgnoreCase(sortOrder) ? "DESC" : "ASC";
+        sql.append("ORDER BY ").append(orderColumn).append(" ").append(order);
+
         List<Map<String, Object>> devices = new ArrayList<>();
         try (Connection conn = DBUtil.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
+             PreparedStatement ps = conn.prepareStatement(sql.toString());
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 devices.add(mapRow(rs));

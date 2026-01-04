@@ -126,8 +126,12 @@ public class AppRouterServlet extends HttpServlet {
                             break;
                         case "device_list":
                         default:
+                            String sortBy = req.getParameter("sortBy");
+                            String sortOrder = req.getParameter("sortOrder");
                             req.setAttribute("pvStats", pvDao.getPvStats());
-                            req.setAttribute("devices", pvDao.listDevices());
+                            req.setAttribute("devices", pvDao.listDevices(sortBy, sortOrder));
+                            req.setAttribute("selectedSortBy", sortBy);
+                            req.setAttribute("selectedSortOrder", sortOrder);
                             jsp = "/WEB-INF/jsp/pv/device_list.jsp";
                             break;
                     }

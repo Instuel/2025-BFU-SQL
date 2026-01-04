@@ -323,7 +323,233 @@
     </c:when>
 
     <c:when test="${roleType == 'ANALYST'}">
-      ...（保持不变）...
+      <div class="dashboard-container">
+        <div class="dashboard-header">
+          <h1>数据分析师工作台</h1>
+          <p>聚焦光伏预测偏差分析与能耗规律挖掘，生成多维度分析报告，为管理层决策提供数据支撑。</p>
+          <div class="dashboard-meta">
+            <div class="dashboard-meta-item">数据窗口：<c:out value="${analystOverview.dataWindowLabel}" default="近90天"/></div>
+            <div class="dashboard-meta-item">当前模型：<c:out value="${analystOverview.modelName}" default="--"/> v<c:out value="${analystOverview.modelVersion}" default="--"/></div>
+            <div class="dashboard-meta-item">天气因子：<c:out value="${analystOverview.weatherHint}" default="待接入"/></div>
+          </div>
+        </div>
+
+        <!-- 核心指标卡片 -->
+        <div class="dashboard-grid">
+          <div class="dashboard-stat-card pv">
+            <div class="dashboard-stat-label">预测平均偏差率</div>
+            <div class="dashboard-stat-value"><fmt:formatNumber value="${analystOverview.avgDeviationRate}" pattern="#0.00" type="number"/>%</div>
+            <div class="dashboard-stat-trend ${analystOverview.deviationTrend.contains('▼') ? 'up' : 'down'}">
+              <c:out value="${analystOverview.deviationTrend}" default="暂无对比数据"/>
+            </div>
+            <div class="dashboard-stat-subtext">样本数：<c:out value="${analystOverview.sampleCount}" default="--"/> 条</div>
+          </div>
+          <div class="dashboard-stat-card energy">
+            <div class="dashboard-stat-label">产线能耗分析</div>
+            <div class="dashboard-stat-value"><c:out value="${analystOverview.correlationTaskCount}" default="--"/></div>
+            <div class="dashboard-stat-trend up">已完成关联分析</div>
+            <div class="dashboard-stat-subtext">挖掘能耗与产量规律</div>
+          </div>
+          <div class="dashboard-stat-card efficiency">
+            <div class="dashboard-stat-label">季度报告</div>
+            <div class="dashboard-stat-value"><c:out value="${analystOverview.reportCount}" default="--"/></div>
+            <div class="dashboard-stat-trend ${analystOverview.pendingReportCount > 0 ? 'down' : 'up'}">
+              <c:choose>
+                <c:when test="${analystOverview.pendingReportCount > 0}">▲ ${analystOverview.pendingReportCount} 份待关注</c:when>
+                <c:otherwise>全部表现良好</c:otherwise>
+              </c:choose>
+            </div>
+            <div class="dashboard-stat-subtext">为管理层决策提供支撑</div>
+          </div>
+        </div>
+
+        <!-- 光伏预测偏差分析 -->
+        <section class="dashboard-chart-section">
+          <div class="dashboard-chart-header">
+            <div>
+              <div class="dashboard-chart-title">📊 光伏预测偏差分析</div>
+              <div class="dashboard-section-hint">分析预测数据与实际数据的偏差，结合天气因子优化预测模型。</div>
+            </div>
+            <div class="dashboard-chart-actions">
+              <span class="dashboard-badge">偏差率超15%触发优化</span>
+              <a class="dashboard-chart-action-btn" href="${ctx}/app?module=pv&view=forecast_list">查看详情</a>
+              <button class="dashboard-chart-action-btn" onclick="window.print()">📄 生成报告</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+              <tr>
+                <th>并网点</th>
+                <th>预测值(kWh)</th>
+                <th>实际值(kWh)</th>
+                <th>偏差率</th>
+                <th>天气因子</th>
+                <th>优化建议</th>
+              </tr>
+              </thead>
+              <tbody>
+              <c:forEach items="${forecastInsights}" var="item">
+                <tr>
+                  <td><c:out value="${item.pointName}" default="-"/></td>
+                  <td><fmt:formatNumber value="${item.forecastVal}" pattern="#,##0.00"/></td>
+                  <td><fmt:formatNumber value="${item.actualVal}" pattern="#,##0.00"/></td>
+                  <td>
+                    <c:set var="devRate" value="${item.deviationRate}"/>
+                    <span class="trend-tag ${devRate > 15 || devRate < -15 ? 'down' : 'up'}">
+                      <fmt:formatNumber value="${devRate}" pattern="#0.00"/>%
+                    </span>
+                  </td>
+                  <td><c:out value="${item.weatherFactor}" default="未接入"/></td>
+                  <td><span class="workbench-tag ${item.optimizationAdvice == '持续观察' ? 'info' : 'warning'}"><c:out value="${item.optimizationAdvice}" default="-"/></span></td>
+                </tr>
+              </c:forEach>
+              <c:if test="${empty forecastInsights}">
+                <tr><td colspan="6" style="text-align:center;color:#94a3b8;">暂无预测偏差数据</td></tr>
+              </c:if>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <div class="content-grid">
+          <div class="dashboard-main-content">
+            <!-- 产线能耗与产量关联分析 -->
+            <section class="dashboard-chart-section">
+              <div class="dashboard-chart-header">
+                <div>
+                  <div class="dashboard-chart-title">⚡ 产线能耗与产量关联分析</div>
+                  <div class="dashboard-section-hint">挖掘能耗数据规律，识别节能潜力，计算单位产量能耗。</div>
+                </div>
+                <div class="dashboard-chart-actions">
+                  <a class="dashboard-chart-action-btn" href="${ctx}/app?module=energy&view=energy_data_list">查看能耗</a>
+                  <button class="dashboard-chart-action-btn" onclick="window.print()">📄 生成报告</button>
+                </div>
+              </div>
+              <div class="table-container">
+                <table class="data-table">
+                  <thead>
+                  <tr>
+                    <th>产线名称</th>
+                    <th>所属厂区</th>
+                    <th>相关系数</th>
+                    <th>单位产量能耗</th>
+                    <th>节能潜力</th>
+                  </tr>
+                  </thead>
+                  <tbody>
+                  <c:forEach items="${energyInsights}" var="item">
+                    <tr>
+                      <td><c:out value="${item.lineName}" default="-"/></td>
+                      <td><c:out value="${item.factoryName}" default="-"/></td>
+                      <td>
+                        <c:choose>
+                          <c:when test="${item.corrCoeff != null}">
+                            <fmt:formatNumber value="${item.corrCoeff}" pattern="#0.000"/>
+                          </c:when>
+                          <c:otherwise>-</c:otherwise>
+                        </c:choose>
+                      </td>
+                      <td>
+                        <c:choose>
+                          <c:when test="${item.energyPerOutput != null}">
+                            <fmt:formatNumber value="${item.energyPerOutput}" pattern="#0.00"/> kWh/件
+                          </c:when>
+                          <c:otherwise>-</c:otherwise>
+                        </c:choose>
+                      </td>
+                      <td>
+                        <c:set var="potential" value="${item.savingPotential}"/>
+                        <span class="workbench-tag ${potential == '存在节能潜力' ? 'warning' : (potential == '运行效率良好' ? 'success' : 'info')}">
+                          <c:out value="${potential}" default="-"/>
+                        </span>
+                      </td>
+                    </tr>
+                  </c:forEach>
+                  <c:if test="${empty energyInsights}">
+                    <tr><td colspan="5" style="text-align:center;color:#94a3b8;">暂无产线能耗数据</td></tr>
+                  </c:if>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- 季度能源成本分析报告 -->
+            <section class="dashboard-chart-section">
+              <div class="dashboard-chart-header">
+                <div>
+                  <div class="dashboard-chart-title">📋 季度能源成本分析报告</div>
+                  <div class="dashboard-section-hint">按厂区、能源类型汇总季度消耗与成本，为管理层决策提供支撑。</div>
+                </div>
+                <div class="dashboard-chart-actions">
+                  <a class="dashboard-chart-action-btn" href="${ctx}/app?module=energy&view=report_overview">查看全部</a>
+                  <button class="dashboard-chart-action-btn" onclick="window.print()">📄 导出报告</button>
+                </div>
+              </div>
+              <div class="workbench-grid">
+                <c:forEach items="${reportItems}" var="report">
+                  <div class="workbench-card">
+                    <div class="workbench-card-title"><c:out value="${report.reportTitle}" default="季度报告"/></div>
+                    <div class="workbench-card-desc">
+                      <c:out value="${report.factoryName}" default="-"/> · <c:out value="${report.energyType}" default="-"/><br/>
+                      消耗：<fmt:formatNumber value="${report.totalConsumption}" pattern="#,##0.00"/><br/>
+                      成本：¥<fmt:formatNumber value="${report.totalCost}" pattern="#,##0.00"/>
+                    </div>
+                    <div class="workbench-card-meta">
+                      <c:set var="status" value="${report.reportStatus}"/>
+                      <span class="workbench-tag ${status == '表现良好' ? 'success' : (status == '需关注' ? 'warning' : 'info')}">
+                        <c:out value="${status}" default="待提交"/>
+                      </span>
+                    </div>
+                  </div>
+                </c:forEach>
+                <c:if test="${empty reportItems}">
+                  <div class="dashboard-empty">暂无季度报告数据</div>
+                </c:if>
+              </div>
+            </section>
+          </div>
+
+          <div class="dashboard-side-content">
+            <!-- 模型优化任务 -->
+            <section class="dashboard-chart-section">
+              <div class="dashboard-chart-header">
+                <div class="dashboard-chart-title">🔧 模型优化任务</div>
+              </div>
+              <div class="workbench-list">
+                <c:forEach items="${modelOptimizations}" var="opt">
+                  <div class="workbench-list-item">
+                    <div>
+                      <div class="workbench-item-title"><c:out value="${opt.title}" default="-"/></div>
+                      <div class="workbench-item-desc"><c:out value="${opt.desc}" default="-"/></div>
+                    </div>
+                    <c:set var="optStatus" value="${opt.status}"/>
+                    <span class="workbench-tag ${optStatus == '已上线' ? 'success' : (optStatus == '待处理' ? 'warning' : 'info')}">
+                      <c:out value="${optStatus}" default="排队中"/>
+                    </span>
+                  </div>
+                </c:forEach>
+                <c:if test="${empty modelOptimizations}">
+                  <div class="dashboard-empty">暂无优化任务</div>
+                </c:if>
+              </div>
+            </section>
+
+            <!-- 快速操作 -->
+            <section class="dashboard-chart-section">
+              <div class="dashboard-chart-header">
+                <div class="dashboard-chart-title">⚡ 快速操作</div>
+              </div>
+              <div class="dashboard-actions" style="flex-direction:column;gap:12px;">
+                <a class="dashboard-chart-action-btn" href="${ctx}/app?module=pv&view=forecast_list" style="display:block;text-align:center;">📈 预测偏差详情</a>
+                <a class="dashboard-chart-action-btn" href="${ctx}/app?module=pv&view=model_alert_list" style="display:block;text-align:center;">🚨 模型告警列表</a>
+                <a class="dashboard-chart-action-btn" href="${ctx}/app?module=energy&view=peak_valley_list" style="display:block;text-align:center;">📊 峰谷分析</a>
+                <a class="dashboard-chart-action-btn" href="${ctx}/app?module=energy&view=report_overview" style="display:block;text-align:center;">📋 能耗报表总览</a>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
     </c:when>
 
     <c:when test="${roleType == 'EXEC'}">
