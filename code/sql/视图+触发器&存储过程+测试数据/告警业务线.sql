@@ -248,26 +248,27 @@ BEGIN TRY
     SET IDENTITY_INSERT dbo.Alarm_Info ON;
     MERGE dbo.Alarm_Info AS T
     USING (VALUES
-        (1, N'越限告警', N'高', N'变压器1绕组温度超限', CONVERT(datetime2(0),'2025-12-30 09:00:00'), N'未处理', 80.0, 1, NULL, N'待审核'),
-        (2, N'设备故障', N'高', N'变压器1油位异常', CONVERT(datetime2(0),'2025-12-30 09:10:00'), N'未处理', NULL, 1, NULL, N'待审核'),
-        (3, N'通讯故障', N'高', N'电表1通讯中断', CONVERT(datetime2(0),'2025-12-30 09:20:00'), N'未处理', NULL, 2, NULL, N'待审核'),
-        (4, N'越限告警', N'高', N'回路1电流过载', CONVERT(datetime2(0),'2025-12-30 09:30:00'), N'处理中', 100.0, 2, NULL, N'误报'),
-        (5, N'设备故障', N'高', N'逆变器1故障停机', CONVERT(datetime2(0),'2025-12-30 09:40:00'), N'已结案', NULL, 3, NULL, N'有效'),
-        (6, N'设备离线', N'高', N'逆变器1短暂离线', CONVERT(datetime2(0),'2025-12-30 09:50:00'), N'处理中', NULL, 3, NULL, N'待审核'),
-        (7, N'环境告警', N'高', N'配电室A温度过高', CONVERT(datetime2(0),'2025-12-30 10:00:00'), N'已结案', 35.0, 4, NULL, N'有效'),
-        (8, N'安全告警', N'高', N'配电室A门禁异常', CONVERT(datetime2(0),'2025-12-30 10:10:00'), N'已结案', NULL, 4, NULL, N'有效'),
-        (9, N'通讯故障', N'中', N'水表1通讯波动', CONVERT(datetime2(0),'2025-12-30 11:00:00'), N'未处理', NULL, 2, NULL, N'待审核'),
-        (10, N'设备故障', N'中', N'电表2精度异常', CONVERT(datetime2(0),'2025-12-30 11:10:00'), N'处理中', NULL, 2, NULL, N'待审核'),
-        (11, N'越限告警', N'中', N'回路2功率因数偏低', CONVERT(datetime2(0),'2025-12-30 11:20:00'), N'已结案', 95.0, 2, NULL, N'有效'),
-        (12, N'设备离线', N'中', N'环境传感器1网络掉线', CONVERT(datetime2(0),'2025-12-30 11:30:00'), N'已结案', NULL, 4, NULL, N'有效'),
-        (13, N'环境告警', N'中', N'配电室B湿度过高', CONVERT(datetime2(0),'2025-12-30 11:40:00'), N'未处理', 70.0, 4, NULL, N'待审核'),
-        (14, N'安全告警', N'中', N'非法刷卡失败多次', CONVERT(datetime2(0),'2025-12-30 11:50:00'), N'已结案', NULL, 4, NULL, N'有效'),
-        (15, N'通讯故障', N'低', N'临时测试点通讯丢包', CONVERT(datetime2(0),'2025-12-30 12:00:00'), N'未处理', NULL, 2, NULL, N'待审核'),
-        (16, N'越限告警', N'低', N'支路电流轻微超限', CONVERT(datetime2(0),'2025-12-30 12:10:00'), N'已结案', 110.0, 2, NULL, N'有效'),
-        (17, N'设备故障', N'低', N'指示灯损坏', CONVERT(datetime2(0),'2025-12-30 12:20:00'), N'处理中', NULL, 3, NULL, N'待审核'),
-        (18, N'环境告警', N'低', N'仓库温度略有波动', CONVERT(datetime2(0),'2025-12-30 12:30:00'), N'已结案', NULL, 4, NULL, N'误报'),
-        (19, N'安全告警', N'低', N'异常登录告警', CONVERT(datetime2(0),'2025-12-30 12:40:00'), N'已结案', NULL, 4, NULL, N'有效'),
-        (20, N'其他', N'低', N'测试用告警', CONVERT(datetime2(0),'2025-12-30 12:50:00'), N'未处理', NULL, 1, NULL, N'待审核')
+        -- 新产生的告警->待审核->只能是未处理，误报的告警->已结案, 有效->未处理/处理中/已结案。
+        (1,  N'越限告警', N'高', N'变压器1绕组温度超限',        CONVERT(datetime2(0),'2025-12-30 09:00:00'), N'未处理',  80.0, 1, NULL, N'待审核'),
+        (2,  N'设备故障', N'高', N'变压器1油位异常',            CONVERT(datetime2(0),'2025-12-30 09:10:00'), N'未处理',  NULL, 1, NULL, N'待审核'),
+        (3,  N'通讯故障', N'高', N'电表1通讯中断',              CONVERT(datetime2(0),'2025-12-30 09:20:00'), N'未处理',  NULL, 2, NULL, N'待审核'),
+        (4,  N'越限告警', N'高', N'回路1电流过载',              CONVERT(datetime2(0),'2025-12-30 09:30:00'), N'已结案', 100.0, 2, NULL, N'误报'),
+        (5,  N'设备故障', N'高', N'逆变器1故障停机',            CONVERT(datetime2(0),'2025-12-30 09:40:00'), N'已结案',  NULL, 3, NULL, N'有效'),
+        (6,  N'设备离线', N'高', N'逆变器1短暂离线',            CONVERT(datetime2(0),'2025-12-30 09:50:00'), N'处理中',  NULL, 3, NULL, N'有效'),
+        (7,  N'环境告警', N'高', N'配电室A温度过高',            CONVERT(datetime2(0),'2025-12-30 10:00:00'), N'已结案',  35.0, 4, NULL, N'有效'),
+        (8,  N'安全告警', N'高', N'配电室A门禁异常',            CONVERT(datetime2(0),'2025-12-30 10:10:00'), N'已结案',  NULL, 4, NULL, N'有效'),
+        (9,  N'通讯故障', N'中', N'水表1通讯波动',              CONVERT(datetime2(0),'2025-12-30 11:00:00'), N'未处理',  NULL, 2, NULL, N'待审核'),
+        (10, N'设备故障', N'中', N'电表2精度异常',              CONVERT(datetime2(0),'2025-12-30 11:10:00'), N'处理中',  NULL, 2, NULL, N'有效'),
+        (11, N'越限告警', N'中', N'回路2功率因数偏低',          CONVERT(datetime2(0),'2025-12-30 11:20:00'), N'已结案',  95.0, 2, NULL, N'有效'),
+        (12, N'设备离线', N'中', N'环境传感器1网络掉线',        CONVERT(datetime2(0),'2025-12-30 11:30:00'), N'已结案',  NULL, 4, NULL, N'有效'),
+        (13, N'环境告警', N'中', N'配电室B湿度过高',            CONVERT(datetime2(0),'2025-12-30 11:40:00'), N'未处理',  70.0, 4, NULL, N'待审核'),
+        (14, N'安全告警', N'中', N'非法刷卡失败多次',            CONVERT(datetime2(0),'2025-12-30 11:50:00'), N'已结案',  NULL, 4, NULL, N'有效'),
+        (15, N'通讯故障', N'低', N'临时测试点通讯丢包',         CONVERT(datetime2(0),'2025-12-30 12:00:00'), N'未处理',  NULL, 2, NULL, N'待审核'),
+        (16, N'越限告警', N'低', N'支路电流轻微超限',           CONVERT(datetime2(0),'2025-12-30 12:10:00'), N'已结案', 110.0, 2, NULL, N'有效'),
+        (17, N'设备故障', N'低', N'指示灯损坏',                 CONVERT(datetime2(0),'2025-12-30 12:20:00'), N'处理中',  NULL, 3, NULL, N'有效'),
+        (18, N'环境告警', N'低', N'仓库温度略有波动',           CONVERT(datetime2(0),'2025-12-30 12:30:00'), N'已结案',  NULL, 4, NULL, N'误报'),
+        (19, N'安全告警', N'低', N'异常登录告警',               CONVERT(datetime2(0),'2025-12-30 12:40:00'), N'已结案',  NULL, 4, NULL, N'有效'),
+        (20, N'其他',     N'低', N'测试用告警',                 CONVERT(datetime2(0),'2025-12-30 12:50:00'), N'未处理',  NULL, 1, NULL, N'待审核')
     ) AS S(Alarm_ID, Alarm_Type, Alarm_Level, Content, Occur_Time, Process_Status, Trigger_Threshold, Ledger_ID, Factory_ID, Verify_Status)
     ON T.Alarm_ID = S.Alarm_ID
     WHEN MATCHED THEN UPDATE SET

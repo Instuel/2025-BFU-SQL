@@ -276,7 +276,6 @@ PRINT '已创建视图: View_Factory_Energy_Cost（厂区能耗成本汇总）';
 GO
 
 -- 4.3 视图3：待核实能耗数据视图
--- 修正：已删除 ORDER BY 子句
 GO
 CREATE OR ALTER VIEW View_Energy_ToVerify AS
 SELECT 
@@ -298,7 +297,6 @@ FROM Data_Energy de
 JOIN Energy_Meter m ON de.Meter_ID = m.Meter_ID
 JOIN Base_Factory f ON de.Factory_ID = f.Factory_ID
 WHERE de.Quality IN (N'中', N'差'); 
--- 注意：这里绝对不能写 ORDER BY
 GO
 
 PRINT '已创建视图: View_Energy_ToVerify';
