@@ -79,7 +79,9 @@ public class ExecDashboardDao {
                      "FROM Alarm_Info a " +
                      "LEFT JOIN Device_Ledger l ON a.Ledger_ID = l.Ledger_ID " +
                      "LEFT JOIN Base_Factory f ON a.Factory_ID = f.Factory_ID " +
+                     "LEFT JOIN Sys_Alarm_Rule r ON a.Alarm_Type = r.Alarm_Type " +
                      "WHERE a.Alarm_Level = '高' " +
+                     "  AND (r.Is_Enabled IS NULL OR r.Is_Enabled = 1) " +
                      "ORDER BY a.Occur_Time DESC, a.Alarm_ID DESC";
         List<Map<String, Object>> items = new ArrayList<>();
         try (Connection conn = DBUtil.getConnection();
@@ -126,14 +128,16 @@ public class ExecDashboardDao {
         String sql;
         if ("quarter".equalsIgnoreCase(cycle)) {
             sql = "SELECT TOP 6 YEAR(Stat_Date) AS statYear, DATEPART(QUARTER, Stat_Date) AS statQuarter, " +
-                  "SUM(Total_Consumption) AS totalConsumption, SUM(Cost_Amount) AS totalCost " +
-                  "FROM Data_PeakValley " +
+                  "SUM(Total_Consumption) AS totalConsumption, " +
+                  "SUM(Cost_Amount) AS totalCost " +
+                  "FROM View_PeakValley_Dynamic " +
                   "GROUP BY YEAR(Stat_Date), DATEPART(QUARTER, Stat_Date) " +
                   "ORDER BY statYear DESC, statQuarter DESC";
         } else {
             sql = "SELECT TOP 6 YEAR(Stat_Date) AS statYear, MONTH(Stat_Date) AS statMonth, " +
-                  "SUM(Total_Consumption) AS totalConsumption, SUM(Cost_Amount) AS totalCost " +
-                  "FROM Data_PeakValley " +
+                  "SUM(Total_Consumption) AS totalConsumption, " +
+                  "SUM(Cost_Amount) AS totalCost " +
+                  "FROM View_PeakValley_Dynamic " +
                   "GROUP BY YEAR(Stat_Date), MONTH(Stat_Date) " +
                   "ORDER BY statYear DESC, statMonth DESC";
         }
@@ -144,11 +148,14 @@ public class ExecDashboardDao {
             while (rs.next()) {
                 Map<String, Object> row = new HashMap<>();
                 int year = rs.getInt("statYear");
+                row.put("statYear", year);
                 if ("quarter".equalsIgnoreCase(cycle)) {
                     int quarter = rs.getInt("statQuarter");
+                    row.put("statQuarter", quarter);
                     row.put("periodLabel", String.format("%d-Q%d", year, quarter));
                 } else {
                     int month = rs.getInt("statMonth");
+                    row.put("statMonth", month);
                     row.put("periodLabel", String.format("%d-%02d", year, month));
                 }
                 row.put("totalConsumption", rs.getBigDecimal("totalConsumption"));
@@ -258,10 +265,13 @@ public class ExecDashboardDao {
 
     private AlarmSummary queryAlarmSummary(LocalDate start, LocalDate end) throws Exception {
         String sql = "SELECT COUNT(*) AS totalCount, " +
-                     "SUM(CASE WHEN Alarm_Level = '高' THEN 1 ELSE 0 END) AS highCount, " +
-                     "SUM(CASE WHEN Alarm_Level = '高' AND Occur_Time >= DATEADD(DAY, -7, SYSDATETIME()) " +
+                     "SUM(CASE WHEN a.Alarm_Level = '高' THEN 1 ELSE 0 END) AS highCount, " +
+                     "SUM(CASE WHEN a.Alarm_Level = '高' AND a.Occur_Time >= DATEADD(DAY, -7, SYSDATETIME()) " +
                      "THEN 1 ELSE 0 END) AS recentHighCount " +
-                     "FROM Alarm_Info WHERE Occur_Time >= ? AND Occur_Time < ?";
+                     "FROM Alarm_Info a " +
+                     "LEFT JOIN Sys_Alarm_Rule r ON a.Alarm_Type = r.Alarm_Type " +
+                     "WHERE a.Occur_Time >= ? AND a.Occur_Time < ? " +
+                     "AND (r.Is_Enabled IS NULL OR r.Is_Enabled = 1)";
         LocalDateTime startTime = start.atStartOfDay();
         LocalDateTime endTime = end.atStartOfDay();
         try (Connection conn = DBUtil.getConnection();

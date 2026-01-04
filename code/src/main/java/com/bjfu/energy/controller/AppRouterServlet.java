@@ -221,6 +221,9 @@ public class AppRouterServlet extends HttpServlet {
                             req.setAttribute("factories", energyDao.listFactories());
                             req.setAttribute("planStats", energyDao.getOptimizationStats());
                             req.setAttribute("plans", energyDao.listOptimizationPlans());
+                            // 复用峰谷动态统计结果，作为制定优化方案的参考数据
+                            req.setAttribute("reportStats", energyDao.getLatestPeakValleyReportStats());
+                            req.setAttribute("peakValleySummaries", energyDao.listPeakValleySummary(null, null));
                             jsp = "/WEB-INF/jsp/energy/energy_optimization_plan.jsp";
                             break;
                         case "investigation_list":

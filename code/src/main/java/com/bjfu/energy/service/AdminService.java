@@ -90,15 +90,37 @@ public class AdminService {
         if (endTime == null || endTime.trim().isEmpty()) {
             throw new IllegalArgumentException("结束时间不能为空");
         }
+
+        // 统一映射为数据库允许的四种类型：低谷、平段、高峰、尖峰
+        String rawType = timeType.trim();
+        String normalizedType;
+        switch (rawType) {
+            case "谷":
+                normalizedType = "低谷";
+                break;
+            case "平":
+                normalizedType = "平段";
+                break;
+            case "峰":
+                normalizedType = "高峰";
+                break;
+            case "尖":
+                normalizedType = "尖峰";
+                break;
+            default:
+                normalizedType = rawType;
+                break;
+        }
+
         PeakValleyConfig config = new PeakValleyConfig();
-        config.setTimeType(timeType.trim());
+        config.setTimeType(normalizedType);
         config.setStartTime(LocalTime.parse(startTime));
         config.setEndTime(LocalTime.parse(endTime));
         if (priceRate != null && !priceRate.trim().isEmpty()) {
             config.setPriceRate(new BigDecimal(priceRate.trim()));
         }
         adminDao.savePeakValleyConfig(config);
-        writeAuditLog("峰谷时段配置", "新增 " + timeType + " " + startTime + "-" + endTime, operatorId);
+        writeAuditLog("峰谷时段配置", "新增 " + normalizedType + " " + startTime + "-" + endTime, operatorId);
     }
 
     public List<BackupLog> listBackupLogs() throws Exception {

@@ -234,18 +234,45 @@ public class AdminDao {
     }
 
     public void savePeakValleyConfig(PeakValleyConfig config) throws Exception {
-        String sql = "INSERT INTO Config_PeakValley (Time_Type, Start_Time, End_Time, Price_Rate) VALUES (?, ?, ?, ?)";
+        // 如果已存在相同 Time_Type 的配置，则执行更新；否则插入新记录
+        String querySql = "SELECT Config_ID FROM Config_PeakValley WHERE Time_Type = ?";
         try (Connection conn = DBUtil.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, config.getTimeType());
-            ps.setTime(2, config.getStartTime() == null ? null : Time.valueOf(config.getStartTime()));
-            ps.setTime(3, config.getEndTime() == null ? null : Time.valueOf(config.getEndTime()));
-            if (config.getPriceRate() == null) {
-                ps.setNull(4, java.sql.Types.DECIMAL);
-            } else {
-                ps.setBigDecimal(4, config.getPriceRate());
+             PreparedStatement queryPs = conn.prepareStatement(querySql)) {
+            queryPs.setString(1, config.getTimeType());
+            try (ResultSet rs = queryPs.executeQuery()) {
+                if (rs.next()) {
+                    // 已存在该时段类型，执行 UPDATE
+                    String updateSql = "UPDATE Config_PeakValley "
+                                     + "SET Start_Time = ?, End_Time = ?, Price_Rate = ? "
+                                     + "WHERE Time_Type = ?";
+                    try (PreparedStatement ps = conn.prepareStatement(updateSql)) {
+                        ps.setTime(1, config.getStartTime() == null ? null : Time.valueOf(config.getStartTime()));
+                        ps.setTime(2, config.getEndTime() == null ? null : Time.valueOf(config.getEndTime()));
+                        if (config.getPriceRate() == null) {
+                            ps.setNull(3, java.sql.Types.DECIMAL);
+                        } else {
+                            ps.setBigDecimal(3, config.getPriceRate());
+                        }
+                        ps.setString(4, config.getTimeType());
+                        ps.executeUpdate();
+                    }
+                } else {
+                    // 不存在则插入
+                    String insertSql = "INSERT INTO Config_PeakValley (Time_Type, Start_Time, End_Time, Price_Rate) "
+                                     + "VALUES (?, ?, ?, ?)";
+                    try (PreparedStatement ps = conn.prepareStatement(insertSql)) {
+                        ps.setString(1, config.getTimeType());
+                        ps.setTime(2, config.getStartTime() == null ? null : Time.valueOf(config.getStartTime()));
+                        ps.setTime(3, config.getEndTime() == null ? null : Time.valueOf(config.getEndTime()));
+                        if (config.getPriceRate() == null) {
+                            ps.setNull(4, java.sql.Types.DECIMAL);
+                        } else {
+                            ps.setBigDecimal(4, config.getPriceRate());
+                        }
+                        ps.executeUpdate();
+                    }
+                }
             }
-            ps.executeUpdate();
         }
     }
 
