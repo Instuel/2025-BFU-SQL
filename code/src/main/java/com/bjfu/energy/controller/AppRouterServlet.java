@@ -3,6 +3,7 @@ package com.bjfu.energy.controller;
 import com.bjfu.energy.dao.AnalystDao;
 import com.bjfu.energy.dao.EnergyDao;
 import com.bjfu.energy.dao.ExecDashboardDao;
+import com.bjfu.energy.dao.AdminDao;
 import com.bjfu.energy.dao.PvDao;
 import com.bjfu.energy.entity.SysUser;
 
@@ -26,6 +27,7 @@ public class AppRouterServlet extends HttpServlet {
     private final PvDao pvDao = new PvDao();
     private final ExecDashboardDao execDashboardDao = new ExecDashboardDao();
     private final AnalystDao analystDao = new AnalystDao();
+    private final AdminDao adminDao = new AdminDao();
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
@@ -44,6 +46,22 @@ public class AppRouterServlet extends HttpServlet {
         switch (module) {
             case "dashboard":
                 roleType = getRoleType(req);
+                if ("ADMIN".equals(roleType)) {
+                    try {
+                        req.setAttribute("systemCounters", adminDao.loadSystemCounters());
+                        req.setAttribute("latestBackupTime", adminDao.findLatestBackupTime());
+                        req.setAttribute("dbLatencyMs", adminDao.measureDbLatencyMs());
+                        req.setAttribute("apiAvailability", adminDao.loadApiAvailability());
+                        java.util.Map<String, Double> diskUsage = adminDao.queryDiskUsage();
+                        if (diskUsage != null) {
+                            req.setAttribute("diskUsedGb", diskUsage.get("usedGb"));
+                            req.setAttribute("diskTotalGb", diskUsage.get("totalGb"));
+                            req.setAttribute("diskUsagePercent", diskUsage.get("percent"));
+                        }
+                    } catch (Exception e) {
+                        throw new ServletException("系统管理员工作台数据加载失败: " + e.getMessage(), e);
+                    }
+                }
                 if ("EXEC".equals(roleType)) {
                     try {
                         req.setAttribute("execOverview", execDashboardDao.getMonthlyOverview());
@@ -218,6 +236,9 @@ public class AppRouterServlet extends HttpServlet {
                             req.setAttribute("factories", energyDao.listFactories());
                             req.setAttribute("planStats", energyDao.getOptimizationStats());
                             req.setAttribute("plans", energyDao.listOptimizationPlans());
+                            // 复用峰谷动态统计结果，作为制定优化方案的参考数据
+                            req.setAttribute("reportStats", energyDao.getLatestPeakValleyReportStats());
+                            req.setAttribute("peakValleySummaries", energyDao.listPeakValleySummary(null, null));
                             jsp = "/WEB-INF/jsp/energy/energy_optimization_plan.jsp";
                             break;
                         case "investigation_list":

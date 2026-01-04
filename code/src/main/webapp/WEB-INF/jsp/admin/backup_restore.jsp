@@ -43,7 +43,7 @@
           <label class="form-label">备注</label>
           <textarea class="input" name="remark" rows="3" placeholder="说明备份范围或恢复步骤"></textarea>
         </div>
-        <button class="btn btn-primary" type="submit">保存记录</button>
+        <button class="btn btn-primary" type="submit">执行并记录</button>
       </form>
     </div>
 

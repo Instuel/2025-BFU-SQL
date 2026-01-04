@@ -16,7 +16,8 @@
           <p>统一管理用户权限、告警规则与数据运维，保障平台稳定运行。</p>
         </div>
 
-        <div class="admin-module-card">
+        <a class="admin-module-link" href="${ctx}/admin?action=list">
+<div class="admin-module-card">
           <div class="admin-module-icon rbac">👥</div>
           <div class="admin-module-title">账号与权限维护</div>
           <div class="admin-module-desc">维护全员账号信息、角色分配与负责区域限制，确保权限最小化。</div>
@@ -31,8 +32,10 @@
             </div>
           </div>
         </div>
+</a>
 
-        <div class="admin-module-card">
+        <a class="admin-module-link" href="${ctx}/admin?action=alarm_rule">
+<div class="admin-module-card">
           <div class="admin-module-icon alarm">🚨</div>
           <div class="admin-module-title">告警规则配置</div>
           <div class="admin-module-desc">调整设备温度阈值、峰谷时段与告警升级逻辑，提升响应效率。</div>
@@ -47,8 +50,10 @@
             </div>
           </div>
         </div>
+</a>
 
-        <div class="admin-module-card">
+        <a class="admin-module-link" href="${ctx}/admin?action=peak_valley">
+<div class="admin-module-card">
           <div class="admin-module-icon param">🧭</div>
           <div class="admin-module-title">峰谷与参数配置</div>
           <div class="admin-module-desc">维护峰谷电价时段、设备运行参数与能耗核算规则。</div>
@@ -63,8 +68,10 @@
             </div>
           </div>
         </div>
+</a>
 
-        <div class="admin-module-card">
+        <a class="admin-module-link" href="${ctx}/admin?action=backup_restore">
+<div class="admin-module-card">
           <div class="admin-module-icon db">💾</div>
           <div class="admin-module-title">数据备份与恢复</div>
           <div class="admin-module-desc">执行备份策略与恢复演练，监控数据库容量与查询性能。</div>
@@ -79,25 +86,51 @@
             </div>
           </div>
         </div>
+</a>
 
         <div class="admin-system-status">
           <div class="admin-section-title">系统运行状态</div>
           <div class="admin-status-grid">
             <div class="admin-status-item normal">
               <div class="admin-status-label">数据库响应时间</div>
-              <div class="admin-status-value">168 ms</div>
+              <div class="admin-status-value">
+                <c:choose>
+                  <c:when test="${not empty dbLatencyMs}">
+                    ${dbLatencyMs} ms
+                  </c:when>
+                  <c:otherwise>--</c:otherwise>
+                </c:choose>
+              </div>
             </div>
             <div class="admin-status-item normal">
               <div class="admin-status-label">接口可用率</div>
-              <div class="admin-status-value">99.92%</div>
+              <div class="admin-status-value">
+                <c:choose>
+                  <c:when test="${not empty apiAvailability}">
+                    <fmt:formatNumber value="${apiAvailability}" minFractionDigits="2" maxFractionDigits="2"/>%
+                  </c:when>
+                  <c:otherwise>--</c:otherwise>
+                </c:choose>
+              </div>
             </div>
             <div class="admin-status-item warning">
               <div class="admin-status-label">磁盘占用</div>
-              <div class="admin-status-value">72% / 1.4 TB</div>
+              <div class="admin-status-value">
+                <c:choose>
+                  <c:when test="${not empty diskUsagePercent}">
+                    <fmt:formatNumber value="${diskUsagePercent}" minFractionDigits="1" maxFractionDigits="1"/>%
+                    /
+                    <fmt:formatNumber value="${diskTotalGb}" minFractionDigits="1" maxFractionDigits="1"/> GB
+                  </c:when>
+                  <c:otherwise>--</c:otherwise>
+                </c:choose>
+              </div>
             </div>
             <div class="admin-status-item normal">
               <div class="admin-status-label">备份最近执行</div>
-              <div class="admin-status-value">2025-03-18 02:00</div>
+              <div class="admin-status-value">
+                <c:out value="${latestBackupTime}" default="--"/>
+              </div>
             </div>
           </div>
         </div>
@@ -722,21 +755,6 @@
             <div class="dashboard-stat-trend up">▲ 近 7 天新增 <c:out value="${execOverview.alarmRecentHighCount}"/> 条</div>
             <div class="dashboard-stat-subtext">需管理层决策</div>
           </div>
-
-          <div class="dashboard-stat-card energy">
-            <div class="dashboard-stat-label">实时汇总（最新）</div>
-            <div class="dashboard-stat-value">
-              <fmt:formatNumber value="${execRealtime.totalKwh}" pattern="#,##0.##"/> kWh
-            </div>
-            <div class="dashboard-stat-trend up">
-              水 <fmt:formatNumber value="${execRealtime.totalWaterM3}" pattern="#,##0.##"/> m³ ·
-              蒸汽 <fmt:formatNumber value="${execRealtime.totalSteamT}" pattern="#,##0.##"/> t ·
-              天然气 <fmt:formatNumber value="${execRealtime.totalGasM3}" pattern="#,##0.##"/> m³
-            </div>
-            <div class="dashboard-stat-subtext">
-              24h 告警 <c:out value="${execRealtime.totalAlarm}"/>（高 <c:out value="${execRealtime.alarmHigh}"/> / 中 <c:out value="${execRealtime.alarmMid}"/> / 低 <c:out value="${execRealtime.alarmLow}"/>）
-            </div>
-          </div>
         </div>
 
         <div class="content-grid">
@@ -822,103 +840,6 @@
                 ¥ <fmt:formatNumber value="${execOverview.pvSelfSaving}" pattern="#,##0.##"/>，
                 可优先推进高耗能设备改造。
               </div>
-            </section>
-
-            <section class="dashboard-chart-section">
-              <div class="dashboard-chart-header">
-                <div>
-                  <div class="dashboard-chart-title">历史趋势分析</div>
-                  <div class="dashboard-section-hint">支持多周期查询；同比/环比为负标记为“能耗下降”，为正标记为“能耗上升”。</div>
-                </div>
-              </div>
-
-              <form class="dashboard-inline-form" method="get" action="${ctx}/app">
-                <input type="hidden" name="module" value="dashboard"/>
-                <label>能源类型
-                  <select name="trendEnergyType">
-                    <option value="电" <c:out value='${execTrendEnergyType=="电" ? "selected" : ""}'/>>电</option>
-                    <option value="水" <c:out value='${execTrendEnergyType=="水" ? "selected" : ""}'/>>水</option>
-                    <option value="蒸汽" <c:out value='${execTrendEnergyType=="蒸汽" ? "selected" : ""}'/>>蒸汽</option>
-                    <option value="天然气" <c:out value='${execTrendEnergyType=="天然气" ? "selected" : ""}'/>>天然气</option>
-                  </select>
-                </label>
-                <label>统计周期
-                  <select name="trendCycle">
-                    <option value="日" <c:out value='${execTrendCycle=="日" ? "selected" : ""}'/>>日</option>
-                    <option value="周" <c:out value='${execTrendCycle=="周" ? "selected" : ""}'/>>周</option>
-                    <option value="月" <c:out value='${execTrendCycle=="月" ? "selected" : ""}'/>>月</option>
-                    <option value="季度" <c:out value='${execTrendCycle=="季度" ? "selected" : ""}'/>>季度</option>
-                  </select>
-                </label>
-                <button type="submit" class="dashboard-btn">查询</button>
-              </form>
-
-              <c:choose>
-                <c:when test="${empty execTrends}">
-                  <div class="dashboard-empty">暂无历史趋势数据（请确认已执行业务线5补丁 SQL 并插入 Stat_History_Trend 测试数据）。</div>
-                </c:when>
-                <c:otherwise>
-                  <div class="table-container">
-                    <table class="data-table">
-                      <thead>
-                      <tr>
-                        <th>日期</th>
-                        <th>能耗/发电</th>
-                        <th>同比</th>
-                        <th>环比</th>
-                        <th>标记</th>
-                      </tr>
-                      </thead>
-                      <tbody>
-                      <c:forEach items="${execTrends}" var="t">
-                        <tr>
-                          <td><c:out value="${t.statDate}"/></td>
-                          <td><fmt:formatNumber value="${t.value}" pattern="#,##0.##"/></td>
-                          <td><c:out value="${t.yoyRate}"/>%</td>
-                          <td><c:out value="${t.momRate}"/>%</td>
-                          <td><span class="trend-tag <c:out value='${t.trendTag=="能耗下降" ? "up" : "down"}'/>"><c:out value="${t.trendTag}"/></span></td>
-                        </tr>
-                      </c:forEach>
-                      </tbody>
-                    </table>
-                  </div>
-                </c:otherwise>
-              </c:choose>
-
-              <div class="dashboard-section-divider"></div>
-              <div class="dashboard-chart-header" style="margin-top:0;">
-                <div>
-                  <div class="dashboard-chart-title">能耗溯源 · Top 厂区（本月·电）</div>
-                  <div class="dashboard-section-hint">当发现总能耗异常上升，可快速定位高耗能厂区。</div>
-                </div>
-              </div>
-              <c:choose>
-                <c:when test="${empty execTopFactories}">
-                  <div class="dashboard-empty">暂无厂区能耗统计数据。</div>
-                </c:when>
-                <c:otherwise>
-                  <div class="table-container">
-                    <table class="data-table">
-                      <thead>
-                      <tr>
-                        <th>厂区</th>
-                        <th>能耗</th>
-                        <th>成本</th>
-                      </tr>
-                      </thead>
-                      <tbody>
-                      <c:forEach items="${execTopFactories}" var="f">
-                        <tr>
-                          <td><c:out value="${f.factoryName}"/></td>
-                          <td><fmt:formatNumber value="${f.totalConsumption}" pattern="#,##0.##"/></td>
-                          <td>¥ <fmt:formatNumber value="${f.totalCost}" pattern="#,##0.##"/></td>
-                        </tr>
-                      </c:forEach>
-                      </tbody>
-                    </table>
-                  </div>
-                </c:otherwise>
-              </c:choose>
             </section>
 
             <section class="dashboard-chart-section">
