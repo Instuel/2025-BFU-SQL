@@ -1566,39 +1566,63 @@ GO
    负责人：段泓冰
    ============================================================ */
 -- 光伏预测模型表修改
-IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_PV_Model_Status')
+ALTER TABLE PV_Forecast_Model
+ADD CONSTRAINT CK_PV_Model_Status 
+CHECK (Status IN ('Active', 'Inactive', 'Testing', 'Deprecated', 'Training'));
+GO
+
+
+-- 光伏设备表修改
+-- 1. 改通信协议字段
+ALTER TABLE PV_Device
+ADD CONSTRAINT CK_PV_Protocol 
+CHECK (Protocol IN ('RS485', 'Lora'));
+GO
+
+-- 2. 修改 Run_Status 字段约束
+-- 若存在旧约束 CK_PV_Status，则删除
+IF EXISTS (
+    SELECT 1
+    FROM sys.check_constraints
+    WHERE parent_object_id = OBJECT_ID(N'dbo.PV_Device')
+      AND name = N'CK_PV_Status'
+)
 BEGIN
-	ALTER TABLE PV_Forecast_Model
-	ADD CONSTRAINT CK_PV_Model_Status 
-	CHECK (Status IN ('Active', 'Inactive', 'Testing', 'Deprecated', 'Training'));
+    ALTER TABLE dbo.PV_Device DROP CONSTRAINT CK_PV_Status;
 END
 GO
 
--- 光伏设备表修改
-IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_PV_Protocol')
+-- 若已存在同名新约束，删除
+IF EXISTS (
+    SELECT 1
+    FROM sys.check_constraints
+    WHERE parent_object_id = OBJECT_ID(N'dbo.PV_Device')
+      AND name = N'CK_PV_Device_Run_Status'
+)
 BEGIN
-    ALTER TABLE PV_Device
-    ADD CONSTRAINT CK_PV_Protocol 
-    CHECK (Protocol IN ('RS485', 'Lora'));
+    ALTER TABLE dbo.PV_Device DROP CONSTRAINT CK_PV_Device_Run_Status;
 END
 GO
+
+-- 添加新的检查约束
+ALTER TABLE dbo.PV_Device
+ADD CONSTRAINT CK_PV_Device_Run_Status
+CHECK (Run_Status IN (N'正常', N'故障', N'离线', N'异常'));
+GO
+
 
 -- 光伏发电数据表修改
 -- 1. 添加字段
-IF COL_LENGTH('Data_PV_Gen', 'Point_ID') IS NULL
-BEGIN
-    ALTER TABLE Data_PV_Gen
-    ADD 
-        Point_ID BIGINT NULL,                  -- 并网点编号
-        Bus_Voltage DECIMAL(8,2) NULL,         -- 汇流箱组串电压（V）
-        Bus_Current DECIMAL(8,2) NULL,         -- 汇流箱组串电流（A）
-        String_Count INT NULL;                 -- 组串数量（可选）
-END
+ALTER TABLE Data_PV_Gen
+ADD 
+    Point_ID BIGINT NULL,                  -- 并网点编号
+    Bus_Voltage DECIMAL(8,2) NULL,         -- 汇流箱组串电压（V）
+    Bus_Current DECIMAL(8,2) NULL,         -- 汇流箱组串电流（A）
+    String_Count INT NULL;                 -- 组串数量（可选）
 GO
 
 -- 2. 添加外键约束（并网点编号 PV_Grid_Point）
 IF EXISTS (SELECT * FROM sys.tables WHERE name = 'PV_Grid_Point')
-   AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_PVGen_Point')
 BEGIN
     ALTER TABLE Data_PV_Gen
     ADD CONSTRAINT FK_PVGen_Point 
@@ -1606,20 +1630,19 @@ BEGIN
 END
 GO
 
+
 -- 光伏预测数据表修改
--- 注意：先添加计算列
-IF COL_LENGTH('Data_PV_Forecast', 'Deviation_Rate') IS NULL
-BEGIN
-    ALTER TABLE Data_PV_Forecast
-    ADD Deviation_Rate AS (
-        CASE 
-            WHEN Actual_Val IS NOT NULL AND Forecast_Val IS NOT NULL 
-            THEN ((Actual_Val - Forecast_Val) / NULLIF(Forecast_Val, 0)) * 100
-            ELSE NULL 
-        END
-    ) PERSISTED;
-END
+-- 先添加计算列
+ALTER TABLE Data_PV_Forecast
+ADD Deviation_Rate AS (
+    CASE 
+        WHEN Actual_Val IS NOT NULL AND Forecast_Val IS NOT NULL 
+        THEN ((Actual_Val - Forecast_Val) / NULLIF(Forecast_Val, 0)) * 100
+        ELSE NULL 
+    END
+) PERSISTED;
 GO
+
 
 PRINT '分布式光伏管理业务线 表结构修改完成';
 GO
