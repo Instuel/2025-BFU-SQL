@@ -47,12 +47,23 @@ public class AppRouterServlet extends HttpServlet {
                 if ("EXEC".equals(roleType)) {
                     try {
                         req.setAttribute("execOverview", execDashboardDao.getMonthlyOverview());
+                        req.setAttribute("execRealtime", execDashboardDao.getRealtimeSummary());
                         req.setAttribute("execHighAlarms", execDashboardDao.listHighAlarms(6));
                         req.setAttribute("execDecisionItems", execDashboardDao.listDecisionItems());
                         req.setAttribute("execMonthlySummaries", execDashboardDao.listEnergySummaries("month"));
                         req.setAttribute("execQuarterlySummaries", execDashboardDao.listEnergySummaries("quarter"));
                         req.setAttribute("execProjects", execDashboardDao.listResearchProjects());
                         req.setAttribute("execOpenProjects", execDashboardDao.listOpenProjects());
+
+                        // 历史趋势（可通过页面下拉框切换）
+                        String trendEnergyType = req.getParameter("trendEnergyType");
+                        String trendCycle = req.getParameter("trendCycle");
+                        req.setAttribute("execTrendEnergyType", trendEnergyType == null ? "电" : trendEnergyType);
+                        req.setAttribute("execTrendCycle", trendCycle == null ? "月" : trendCycle);
+                        req.setAttribute("execTrends", execDashboardDao.listHistoryTrends(trendEnergyType, trendCycle, 12));
+
+                        // 能耗溯源 Top 厂区（默认本月电）
+                        req.setAttribute("execTopFactories", execDashboardDao.listTopFactories("电", "month", 5));
                         applyFlashMessage(req);
                     } catch (Exception e) {
                         throw new ServletException("管理层大屏数据加载失败: " + e.getMessage(), e);
@@ -361,19 +372,21 @@ public class AppRouterServlet extends HttpServlet {
     }
 
     private void applyFlashMessage(HttpServletRequest req) {
-        HttpSession session = req.getSession(false);
-        if (session == null) {
-            return;
-        }
-        Object message = session.getAttribute("execFlashMessage");
-        Object type = session.getAttribute("execFlashType");
-        if (message != null) {
-            req.setAttribute("execFlashMessage", message);
-            req.setAttribute("execFlashType", type == null ? "info" : type);
-            session.removeAttribute("execFlashMessage");
-            session.removeAttribute("execFlashType");}
-        }
-    private void handleReviewData(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+    HttpSession session = req.getSession(false);
+    if (session == null) {
+        return;
+    }
+    Object message = session.getAttribute("execFlashMessage");
+    Object type = session.getAttribute("execFlashType");
+    if (message != null) {
+        req.setAttribute("execFlashMessage", message);
+        req.setAttribute("execFlashType", type == null ? "info" : type);
+        session.removeAttribute("execFlashMessage");
+        session.removeAttribute("execFlashType");
+    }
+}
+
+private void handleReviewData(HttpServletRequest req, HttpServletResponse resp) throws Exception {
         Long dataId = parseLong(req.getParameter("dataId"));
         String reviewStatus = req.getParameter("reviewStatus");
         String reviewRemark = req.getParameter("reviewRemark");
@@ -437,7 +450,10 @@ public class AppRouterServlet extends HttpServlet {
         }
         String levelValue = (level == null || level.trim().isEmpty()) ? "重点排查" : level.trim();
         energyDao.createInvestigation(factoryId, energyType, levelValue, issueDesc.trim(), owner);
-        resp.sendRedirect(req.getContextPath() + "/app?module=energy&view=investigation_list&success=investigation");}
+        resp.sendRedirect(req.getContextPath() + "/app?module=energy&view=investigation_list&success=investigation");
+    }
+
+
     private void loadAnalystDashboard(HttpServletRequest req) throws ServletException {
         HttpSession session = req.getSession(false);
         String roleType = session == null ? null : (String) session.getAttribute("currentRoleType");
