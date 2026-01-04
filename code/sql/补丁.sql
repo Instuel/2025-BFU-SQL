@@ -412,18 +412,6 @@ WHERE u.Login_Account IN ('om_test_01', 'om_test_02', 'om_test_03', 'om_test_04'
 GO
 
 PRINT '✓ 已完成表结构修改与 5 条运维人员测试数据插入。';
--- 验证查询
-SELECT 
-    u.Real_Name AS 姓名,
-    u.Department AS 部门,
-    f.Factory_Name AS 所属厂区,
-    r.Role_Type AS 角色权限
-FROM dbo.Sys_User u
-JOIN dbo.Role_OandM o ON u.User_ID = o.User_ID
-LEFT JOIN dbo.Base_Factory f ON o.Factory_ID = f.Factory_ID
-JOIN dbo.Sys_Role_Assignment r ON u.User_ID = r.User_ID
-WHERE u.Login_Account LIKE 'om_test_%';
-GO
 
 /* ============================================================
    设备台账表 (Device_Ledger) 结构扩展
@@ -437,7 +425,7 @@ BEGIN
     ALTER TABLE dbo.Device_Ledger
     ADD Factory_ID BIGINT NULL;
     
-    PRINT '已成功向 Device_Ledger 表添加 Factory_ID 字段。';
+    PRINT N'已成功向 Device_Ledger 表添加 Factory_ID 字段。';
 END
 GO
 
