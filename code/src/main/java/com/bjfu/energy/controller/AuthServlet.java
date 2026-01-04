@@ -115,7 +115,12 @@ public class AuthServlet extends HttpServlet {
             session.setAttribute("currentPermModules", permModules);
             session.setAttribute("currentPermUris", permUris);
 
-            resp.sendRedirect(req.getContextPath() + "/app?module=dashboard");
+            // 企业管理层（EXEC）登录后进入专属工作台
+            if ("EXEC".equals(roleType)) {
+                resp.sendRedirect(req.getContextPath() + "/app?module=dashboard&view=execDesk");
+            } else {
+                resp.sendRedirect(req.getContextPath() + "/app?module=dashboard");
+            }
         } catch (Exception e) {
             throw new ServletException("登录失败: " + e.getMessage(), e);
         }

@@ -94,6 +94,82 @@ public class ExecDashboardDao {
     }
 
     /**
+     * 业务线5：大屏展示配置列表（Dashboard_Config）。
+     * <p>
+     * 兼容基础脚本：仅存在 Module_Name / Refresh_Rate / Sort_Rule / Display_Fields / Auth_Level。
+     * 兼容增强脚本：存在 Refresh_Interval / Refresh_Unit / Config_Code 等字段。
+     * </p>
+     */
+    public List<Map<String, Object>> listDashboardConfigs() throws Exception {
+        String sql = "SELECT Config_ID AS configId, " +
+                "Config_Code AS configCode, Module_Name AS moduleName, " +
+                "Refresh_Interval AS refreshInterval, Refresh_Unit AS refreshUnit, " +
+                "Refresh_Rate AS refreshRate, Display_Fields AS displayFields, Sort_Rule AS sortRule, Auth_Level AS authLevel " +
+                "FROM Dashboard_Config ORDER BY Config_ID DESC";
+
+        List<Map<String, Object>> list = new ArrayList<>();
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                Map<String, Object> row = mapRow(rs);
+                normalizeDashboardConfigRow(row);
+                list.add(row);
+            }
+            return list;
+        } catch (Exception e) {
+            // 兼容基础脚本：没有 Config_Code / Refresh_Interval / Refresh_Unit
+            String sql2 = "SELECT Config_ID AS configId, Module_Name AS moduleName, Refresh_Rate AS refreshRate, " +
+                    "Display_Fields AS displayFields, Sort_Rule AS sortRule, Auth_Level AS authLevel " +
+                    "FROM Dashboard_Config ORDER BY Config_ID DESC";
+            try (Connection conn = DBUtil.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(sql2);
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> row = mapRow(rs);
+                    normalizeDashboardConfigRow(row);
+                    list.add(row);
+                }
+            }
+            return list;
+        }
+    }
+
+    /**
+     * 给大屏页面用：把实时汇总行补齐/归一化（避免 JSP 因字段缺失报错）。
+     */
+    public Map<String, Object> normalizeRealtimeForScreen(Map<String, Object> row) {
+        if (row == null) {
+            row = new HashMap<>();
+        }
+        // 复用已有规范化
+        normalizeRealtimeRow(row);
+
+        // 扩展字段默认值
+        row.putIfAbsent("summaryId", "-");
+        row.putIfAbsent("totalWaterM3", BigDecimal.ZERO);
+        row.putIfAbsent("totalSteamT", BigDecimal.ZERO);
+        row.putIfAbsent("totalGasM3", BigDecimal.ZERO);
+        row.putIfAbsent("alarmHigh", 0);
+        row.putIfAbsent("alarmMid", 0);
+        row.putIfAbsent("alarmLow", 0);
+
+        // 光伏自用电量：若无字段则按经验系数估算（页面展示用）
+        if (!row.containsKey("pvSelfKwh") || row.get("pvSelfKwh") == null) {
+            Object pvGenObj = row.get("pvGenKwh");
+            try {
+                BigDecimal pvGen = pvGenObj instanceof BigDecimal
+                        ? (BigDecimal) pvGenObj
+                        : new BigDecimal(String.valueOf(pvGenObj));
+                row.put("pvSelfKwh", pvGen.multiply(SELF_USE_RATE).setScale(3, RoundingMode.HALF_UP));
+            } catch (Exception ignore) {
+                row.put("pvSelfKwh", BigDecimal.ZERO);
+            }
+        }
+        return row;
+    }
+
+    /**
      * 业务线5：历史趋势查询（支持日/周/月等周期）。
      * 直接读取 Stat_History_Trend；若该表为空，返回空列表（页面会给出“暂无数据”）。
      */
@@ -250,6 +326,47 @@ public class ExecDashboardDao {
         row.putIfAbsent("totalKwh", BigDecimal.ZERO);
         row.putIfAbsent("pvGenKwh", BigDecimal.ZERO);
         row.putIfAbsent("totalAlarm", 0);
+    }
+
+    private void normalizeDashboardConfigRow(Map<String, Object> row) {
+        if (row == null) {
+            return;
+        }
+        // 展示字段
+        row.putIfAbsent("displayFields", "-");
+        row.putIfAbsent("sortRule", "-");
+        row.putIfAbsent("authLevel", "-");
+
+        // 兼容：Refresh_Interval / Refresh_Unit 不存在时，从 refreshRate 推断
+        if ((row.get("refreshInterval") == null || row.get("refreshUnit") == null) && row.get("refreshRate") != null) {
+            String rr = String.valueOf(row.get("refreshRate")).trim();
+            // 支持 "10秒" / "5分钟" / "10 s" / "5 min" 等
+            Integer interval = null;
+            String unit = null;
+            String digits = rr.replaceAll("[^0-9]", "");
+            if (!digits.isEmpty()) {
+                try {
+                    interval = Integer.parseInt(digits);
+                } catch (NumberFormatException ignore) {
+                    interval = null;
+                }
+            }
+            if (rr.contains("秒") || rr.toLowerCase().contains("s")) {
+                unit = "秒";
+            } else if (rr.contains("分") || rr.toLowerCase().contains("min")) {
+                unit = "分钟";
+            }
+            if (interval != null) {
+                row.put("refreshInterval", interval);
+            }
+            if (unit != null) {
+                row.put("refreshUnit", unit);
+            }
+        }
+
+        row.putIfAbsent("refreshInterval", 0);
+        row.putIfAbsent("refreshUnit", "秒");
+        row.putIfAbsent("configCode", "-");
     }
 
     private Map<String, Object> computeRealtimeFallback() throws Exception {

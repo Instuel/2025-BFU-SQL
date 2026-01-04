@@ -112,6 +112,9 @@ public class AuthFilter implements Filter {
             module = "alarm";
         } else if (uri.startsWith(ctx + "/admin")) {
             module = "admin";
+        } else if (uri.startsWith(ctx + "/execDashboard")) {
+            // 企业管理层大屏 API：沿用 dashboard 模块权限
+            module = "dashboard";
         }
 
         if (module != null) {
