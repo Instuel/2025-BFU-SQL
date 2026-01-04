@@ -47,11 +47,32 @@
       <p>按照设备类型与运行状态快速定位故障与离线设备。</p>
     </div>
 
+    <div class="pv-device-filter">
+      <form method="get" action="${ctx}/app" class="pv-sort-form">
+        <input type="hidden" name="module" value="pv"/>
+        <input type="hidden" name="view" value="device_list"/>
+        <label class="pv-sort-label">排序方式：</label>
+        <select name="sortBy" class="pv-sort-select">
+          <option value="deviceCode" <c:if test="${selectedSortBy == 'deviceCode'}">selected</c:if>>设备编号</option>
+          <option value="collectTime" <c:if test="${selectedSortBy == 'collectTime'}">selected</c:if>>采集时间</option>
+          <option value="capacity" <c:if test="${selectedSortBy == 'capacity'}">selected</c:if>>装机容量</option>
+          <option value="deviceType" <c:if test="${selectedSortBy == 'deviceType'}">selected</c:if>>设备类型</option>
+        </select>
+        <select name="sortOrder" class="pv-sort-select">
+          <option value="ASC" <c:if test="${selectedSortOrder == 'ASC'}">selected</c:if>>升序</option>
+          <option value="DESC" <c:if test="${selectedSortOrder == 'DESC' || empty selectedSortOrder}">selected</c:if>>降序</option>
+        </select>
+        <button type="submit" class="pv-sort-btn">排序</button>
+      </form>
+    </div>
+
     <div class="pv-device-grid">
       <c:forEach items="${devices}" var="device">
         <div class="pv-device-card">
-          <div class="pv-device-name">${device.deviceCode}（${device.deviceType}）</div>
-          <span class="pv-device-status online"><c:out value="${device.runStatus}" default="未知"/></span>
+          <div class="pv-device-card-header">
+            <div class="pv-device-name">${device.deviceCode}（${device.deviceType}）</div>
+            <span class="pv-device-status online"><c:out value="${device.runStatus}" default="未知"/></span>
+          </div>
           <div class="pv-device-metrics">
             <div class="pv-device-metric">
               <div class="pv-device-metric-label">装机容量</div>
@@ -69,6 +90,9 @@
               <div class="pv-device-metric-label">采集时间</div>
               <div class="pv-device-metric-value"><c:out value="${device.collectTime}" default="-"/></div>
             </div>
+          </div>
+          <div class="pv-device-card-footer">
+            <a href="${ctx}/app?module=pv&view=device_detail&id=${device.deviceId}" class="pv-device-detail-btn">查看详情 →</a>
           </div>
         </div>
       </c:forEach>

@@ -71,6 +71,319 @@ public class ExecDashboardDao {
         return overview;
     }
 
+    /**
+     * 业务线5：大屏实时汇总
+     * <p>
+     * 规则：优先读取 Stat_Realtime（由调度/触发器/ETL 等写入），按 Stat_Time 倒序取最新一条。
+     * 若 Stat_Realtime 为空，则从业务表做兜底汇总：
+     * - 能耗（电/水/蒸汽/天然气）：取 Data_PeakValley 最新 Stat_Date 的按能源类型汇总值；
+     * - 光伏发电：取 Data_PV_Gen 最新一天汇总；
+     * - 告警：取 Alarm_Info 近 24 小时的总数 + 按等级/处理状态的拆分。
+     * </p>
+     */
+    public Map<String, Object> getRealtimeSummary() throws Exception {
+        try {
+            Map<String, Object> fromTable = queryRealtimeFromStatTable();
+            if (fromTable != null) {
+                return fromTable;
+            }
+        } catch (Exception ignore) {
+            // 可能表不存在或列不完整：走兜底计算
+        }
+        return computeRealtimeFallback();
+    }
+
+    /**
+     * 业务线5：历史趋势查询（支持日/周/月等周期）。
+     * 直接读取 Stat_History_Trend；若该表为空，返回空列表（页面会给出“暂无数据”）。
+     */
+    public List<Map<String, Object>> listHistoryTrends(String energyType, String statCycle, int limit) throws Exception {
+        if (energyType == null || energyType.trim().isEmpty()) {
+            energyType = "电";
+        }
+        if (statCycle == null || statCycle.trim().isEmpty()) {
+            statCycle = "月";
+        }
+        if (limit <= 0) {
+            limit = 12;
+        }
+
+        String sql = "SELECT TOP " + limit + " Trend_ID AS trendId, Energy_Type AS energyType, Stat_Cycle AS statCycle, " +
+                "CONVERT(VARCHAR(10), Stat_Date, 120) AS statDate, Value AS value, YOY_Rate AS yoyRate, MOM_Rate AS momRate, " +
+                "Industry_Avg AS industryAvg, Trend_Tag AS trendTag " +
+                "FROM Stat_History_Trend WHERE Energy_Type = ? AND Stat_Cycle = ? ORDER BY Stat_Date DESC";
+
+        List<Map<String, Object>> list = new ArrayList<>();
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, energyType.trim());
+            ps.setString(2, statCycle.trim());
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> row = mapRow(rs);
+                    if (row.get("trendTag") == null) {
+                        row.put("trendTag", buildTrendTag(row.get("yoyRate"), row.get("momRate")));
+                    }
+                    list.add(row);
+                }
+            }
+        } catch (Exception e) {
+            // 兼容基础脚本：没有扩展列时，退化到基础字段
+            String sql2 = "SELECT TOP " + limit + " Trend_ID AS trendId, Energy_Type AS energyType, Stat_Cycle AS statCycle, " +
+                    "CONVERT(VARCHAR(10), Stat_Date, 120) AS statDate, Value AS value, YOY_Rate AS yoyRate, MOM_Rate AS momRate " +
+                    "FROM Stat_History_Trend WHERE Energy_Type = ? AND Stat_Cycle = ? ORDER BY Stat_Date DESC";
+            try (Connection conn = DBUtil.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(sql2)) {
+                ps.setString(1, energyType.trim());
+                ps.setString(2, statCycle.trim());
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        Map<String, Object> row = mapRow(rs);
+                        row.put("trendTag", buildTrendTag(row.get("yoyRate"), row.get("momRate")));
+                        list.add(row);
+                    }
+                }
+            }
+        }
+        return list;
+    }
+
+    /**
+     * 业务线5：能耗溯源（Top-N 厂区能耗占比）。
+     * period 可选：month（本月）/quarter（本季度）。
+     */
+    public List<Map<String, Object>> listTopFactories(String energyType, String period, int limit) throws Exception {
+        if (energyType == null || energyType.trim().isEmpty()) {
+            energyType = "电";
+        }
+        if (period == null || period.trim().isEmpty()) {
+            period = "month";
+        }
+        if (limit <= 0) {
+            limit = 5;
+        }
+
+        LocalDate today = LocalDate.now();
+        LocalDate start;
+        LocalDate end;
+        if ("quarter".equalsIgnoreCase(period)) {
+            int quarter = (today.getMonthValue() - 1) / 3;
+            int startMonth = quarter * 3 + 1;
+            start = LocalDate.of(today.getYear(), startMonth, 1);
+            end = start.plusMonths(3);
+        } else {
+            start = today.withDayOfMonth(1);
+            end = start.plusMonths(1);
+        }
+
+        String sql = "SELECT TOP " + limit + " f.Factory_Name AS factoryName, " +
+                "SUM(ISNULL(p.Total_Consumption,0)) AS totalConsumption, " +
+                "SUM(ISNULL(p.Cost_Amount,0)) AS totalCost " +
+                "FROM Data_PeakValley p " +
+                "JOIN Base_Factory f ON p.Factory_ID = f.Factory_ID " +
+                "WHERE p.Stat_Date >= ? AND p.Stat_Date < ? AND p.Energy_Type = ? " +
+                "GROUP BY f.Factory_Name " +
+                "ORDER BY SUM(ISNULL(p.Total_Consumption,0)) DESC";
+
+        List<Map<String, Object>> list = new ArrayList<>();
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setDate(1, java.sql.Date.valueOf(start));
+            ps.setDate(2, java.sql.Date.valueOf(end));
+            ps.setString(3, energyType.trim());
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapRow(rs));
+                }
+            }
+        }
+        return list;
+    }
+
+    private Map<String, Object> queryRealtimeFromStatTable() throws Exception {
+        // 先尝试扩展字段（业务线5增强版）
+        String sql = "SELECT TOP 1 Stat_Time AS statTime, Total_KWH AS totalKwh, " +
+                "Total_Water_m3 AS totalWaterM3, Total_Steam_t AS totalSteamT, Total_Gas_m3 AS totalGasM3, " +
+                "PV_Gen_KWH AS pvGenKwh, Total_Alarm AS totalAlarm, Alarm_High AS alarmHigh, Alarm_Mid AS alarmMid, " +
+                "Alarm_Low AS alarmLow, Alarm_Unprocessed AS alarmUnprocessed " +
+                "FROM Stat_Realtime ORDER BY Stat_Time DESC";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (!rs.next()) {
+                return null;
+            }
+            Map<String, Object> row = mapRow(rs);
+            normalizeRealtimeRow(row);
+            return row;
+        } catch (Exception e) {
+            // 基础脚本字段
+            String sql2 = "SELECT TOP 1 Stat_Time AS statTime, Total_KWH AS totalKwh, PV_Gen_KWH AS pvGenKwh, Total_Alarm AS totalAlarm " +
+                    "FROM Stat_Realtime ORDER BY Stat_Time DESC";
+            try (Connection conn = DBUtil.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(sql2);
+                 ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    return null;
+                }
+                Map<String, Object> row = mapRow(rs);
+                normalizeRealtimeRow(row);
+                // 缺失字段置 0
+                row.putIfAbsent("totalWaterM3", BigDecimal.ZERO);
+                row.putIfAbsent("totalSteamT", BigDecimal.ZERO);
+                row.putIfAbsent("totalGasM3", BigDecimal.ZERO);
+                row.putIfAbsent("alarmHigh", 0);
+                row.putIfAbsent("alarmMid", 0);
+                row.putIfAbsent("alarmLow", 0);
+                row.putIfAbsent("alarmUnprocessed", 0);
+                return row;
+            }
+        }
+    }
+
+    private void normalizeRealtimeRow(Map<String, Object> row) {
+        // JSP 里统一使用这些 Key；这里把可能的不同命名/类型统一一下
+        if (row.containsKey("statTime") && row.get("statTime") instanceof Timestamp) {
+            row.put("statTime", ((Timestamp) row.get("statTime")).toLocalDateTime().toString().replace('T', ' '));
+        }
+        // 某些 JDBC 返回 BigDecimal/Double，JSP fmt 都能处理，这里不强转
+        row.putIfAbsent("totalKwh", BigDecimal.ZERO);
+        row.putIfAbsent("pvGenKwh", BigDecimal.ZERO);
+        row.putIfAbsent("totalAlarm", 0);
+    }
+
+    private Map<String, Object> computeRealtimeFallback() throws Exception {
+        Map<String, Object> row = new HashMap<>();
+        row.put("statTime", LocalDateTime.now().toString().replace('T', ' '));
+
+        LocalDate latestDay = null;
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT MAX(Stat_Date) AS maxDay FROM Data_PeakValley");
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next() && rs.getDate(1) != null) {
+                latestDay = rs.getDate(1).toLocalDate();
+            }
+        }
+        if (latestDay == null) {
+            // 没有统计数据
+            row.put("totalKwh", BigDecimal.ZERO);
+            row.put("totalWaterM3", BigDecimal.ZERO);
+            row.put("totalSteamT", BigDecimal.ZERO);
+            row.put("totalGasM3", BigDecimal.ZERO);
+        } else {
+            String sql = "SELECT Energy_Type AS energyType, SUM(ISNULL(Total_Consumption,0)) AS totalConsumption " +
+                    "FROM Data_PeakValley WHERE Stat_Date = ? GROUP BY Energy_Type";
+            try (Connection conn = DBUtil.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setDate(1, java.sql.Date.valueOf(latestDay));
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        String et = rs.getString("energyType");
+                        BigDecimal val = rs.getBigDecimal("totalConsumption");
+                        if (val == null) val = BigDecimal.ZERO;
+                        if ("电".equals(et)) {
+                            row.put("totalKwh", val);
+                        } else if ("水".equals(et)) {
+                            row.put("totalWaterM3", val);
+                        } else if ("蒸汽".equals(et)) {
+                            row.put("totalSteamT", val);
+                        } else if ("天然气".equals(et)) {
+                            row.put("totalGasM3", val);
+                        }
+                    }
+                }
+            }
+        }
+
+        // PV（取最新一天）
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT SUM(ISNULL(Gen_KWH,0)) AS pvGen FROM Data_PV_Gen WHERE CONVERT(DATE, Collect_Time) = (SELECT MAX(CONVERT(DATE, Collect_Time)) FROM Data_PV_Gen)");
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                BigDecimal pvGen = rs.getBigDecimal("pvGen");
+                row.put("pvGenKwh", pvGen == null ? BigDecimal.ZERO : pvGen);
+            }
+        } catch (Exception e) {
+            row.put("pvGenKwh", BigDecimal.ZERO);
+        }
+
+        // 告警（近24小时）
+        try (Connection conn = DBUtil.getConnection()) {
+            String totalSql = "SELECT COUNT(1) AS totalCnt FROM Alarm_Info WHERE Occur_Time >= DATEADD(HOUR, -24, SYSDATETIME())";
+            try (PreparedStatement ps = conn.prepareStatement(totalSql);
+                 ResultSet rs = ps.executeQuery()) {
+                row.put("totalAlarm", rs.next() ? rs.getInt("totalCnt") : 0);
+            }
+            String levelSql = "SELECT Alarm_Level AS level, COUNT(1) AS cnt FROM Alarm_Info WHERE Occur_Time >= DATEADD(HOUR, -24, SYSDATETIME()) GROUP BY Alarm_Level";
+            int high = 0, mid = 0, low = 0;
+            try (PreparedStatement ps = conn.prepareStatement(levelSql);
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String level = rs.getString("level");
+                    int cnt = rs.getInt("cnt");
+                    if (level == null) continue;
+                    if (level.contains("高")) high += cnt;
+                    else if (level.contains("中")) mid += cnt;
+                    else if (level.contains("低")) low += cnt;
+                }
+            }
+            row.put("alarmHigh", high);
+            row.put("alarmMid", mid);
+            row.put("alarmLow", low);
+
+            String unprocessedSql = "SELECT COUNT(1) AS cnt FROM Alarm_Info WHERE Process_Status = '未处理'";
+            try (PreparedStatement ps = conn.prepareStatement(unprocessedSql);
+                 ResultSet rs = ps.executeQuery()) {
+                row.put("alarmUnprocessed", rs.next() ? rs.getInt("cnt") : 0);
+            }
+        } catch (Exception e) {
+            row.put("totalAlarm", 0);
+            row.put("alarmHigh", 0);
+            row.put("alarmMid", 0);
+            row.put("alarmLow", 0);
+            row.put("alarmUnprocessed", 0);
+        }
+
+        // 缺省兜底
+        row.putIfAbsent("totalKwh", BigDecimal.ZERO);
+        row.putIfAbsent("totalWaterM3", BigDecimal.ZERO);
+        row.putIfAbsent("totalSteamT", BigDecimal.ZERO);
+        row.putIfAbsent("totalGasM3", BigDecimal.ZERO);
+        row.putIfAbsent("pvGenKwh", BigDecimal.ZERO);
+        row.putIfAbsent("totalAlarm", 0);
+        return row;
+    }
+
+    private String buildTrendTag(Object yoyRate, Object momRate) {
+        // 任务书要求：同比/环比为负标“下降”，为正标“上升”。这里优先同比，其次环比。
+        Double yoy = toDouble(yoyRate);
+        Double mom = toDouble(momRate);
+        Double base = yoy != null ? yoy : mom;
+        if (base == null) {
+            return "暂无";
+        }
+        if (base < 0) {
+            return "能耗下降";
+        }
+        if (base > 0) {
+            return "能耗上升";
+        }
+        return "平稳";
+    }
+
+    private Double toDouble(Object val) {
+        if (val == null) return null;
+        if (val instanceof Number) {
+            return ((Number) val).doubleValue();
+        }
+        try {
+            return Double.parseDouble(val.toString());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     public List<Map<String, Object>> listHighAlarms(int limit) throws Exception {
         String sql = "SELECT TOP " + limit + " a.Alarm_ID AS alarmId, a.Content AS content, " +
                      "CONVERT(VARCHAR(16), a.Occur_Time, 120) AS occurTime, " +

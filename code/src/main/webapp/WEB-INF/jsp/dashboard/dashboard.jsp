@@ -714,6 +714,7 @@
             <div class="dashboard-meta-item">月度能耗总结：<c:out value="${execOverview.monthLabel}"/></div>
             <div class="dashboard-meta-item">高等级告警：<c:out value="${execOverview.alarmHighCount}"/> 条</div>
             <div class="dashboard-meta-item">科研项目：<c:out value="${execOverview.pendingProjectCount}"/> 项待跟进</div>
+            <div class="dashboard-meta-item">实时刷新：<c:out value="${execRealtime.statTime}"/></div>
           </div>
         </div>
 
