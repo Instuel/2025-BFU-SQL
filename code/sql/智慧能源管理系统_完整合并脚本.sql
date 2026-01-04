@@ -734,6 +734,7 @@ INSERT INTO Sys_Permission (Perm_Code, Perm_Name, Module, Uri_Pattern) VALUES
 ('MODULE_ENERGY', N'综合能耗模块', 'energy', NULL),
 ('MODULE_ALARM', N'告警运维模块', 'alarm', NULL),
 ('MODULE_ADMIN', N'系统管理模块', 'admin', NULL),
+('MODULE_DISPATCHER', N'运维工单管理模块', 'dispatcher', NULL),
 ('ADMIN_USER_MANAGE', N'账号管理', NULL, '/admin');
 
 /* === 4. 初始化角色权限 === */
@@ -745,6 +746,7 @@ INSERT INTO Sys_Role_Permission (Role_Type, Perm_Code) VALUES
 ('ADMIN','MODULE_ENERGY'),
 ('ADMIN','MODULE_ALARM'),
 ('ADMIN','MODULE_ADMIN'),
+('ADMIN','MODULE_DISPATCHER'),
 ('ADMIN','ADMIN_USER_MANAGE');
 
 -- 运维人员
@@ -769,9 +771,10 @@ INSERT INTO Sys_Role_Permission (Role_Type, Perm_Code) VALUES
 ('EXEC','MODULE_DASHBOARD'),
 ('EXEC','MODULE_ENERGY');
 
+-- 运维工单管理人员
 INSERT INTO Sys_Role_Permission (Role_Type, Perm_Code) VALUES
 ('DISPATCHER','MODULE_DASHBOARD'),
-('DISPATCHER','MODULE_ENERGY');
+('DISPATCHER','MODULE_DISPATCHER');
 
 
 /* ======================= 3) 系统管理员功能扩展（已修复角色类型约束） ======================= */
