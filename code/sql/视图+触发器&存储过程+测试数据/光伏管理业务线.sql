@@ -1,10 +1,4 @@
 /* ============================================================
-   分布式光伏管理业务线 
-   负责人：段泓冰
-   ============================================================ */
-
-
-/* ============================================================
    Part 2: 构建视图
    ============================================================ */
 
@@ -333,6 +327,20 @@ END;
 GO
 
 -- 触发器3：在插入或更新发电数据时实时检查逆变器效率
+/* ============================================================
+   修复：先确保 PV_Device 表有 Last_Update_Time 字段
+   ============================================================ */
+IF COL_LENGTH('PV_Device', 'Last_Update_Time') IS NULL
+BEGIN
+    ALTER TABLE PV_Device
+    ADD Last_Update_Time DATETIME NULL DEFAULT GETDATE();
+    PRINT '已自动为 PV_Device 表补全 Last_Update_Time 字段';
+END
+GO
+
+/* ============================================================
+   触发器3：在插入或更新发电数据时实时检查逆变器效率
+   ============================================================ */
 IF OBJECT_ID('TR_Check_Inverter_Efficiency', 'TR') IS NOT NULL
     DROP TRIGGER TR_Check_Inverter_Efficiency;
 GO
@@ -346,44 +354,40 @@ BEGIN
     
     DECLARE @UpdatedCount INT = 0;
     
-    -- 对于UPDATE操作，只检查Inverter_Eff字段被修改的情况
-    -- 对于INSERT操作，直接检查所有插入的数据
+    -- 1. 基础检查：是否有数据插入
     IF NOT EXISTS (SELECT 1 FROM inserted)
         RETURN;
     
-    -- 检查插入或更新的数据中是否有逆变器效率低于85%的记录
+    -- 2. 核心逻辑：检查效率 < 85% 且状态正常的逆变器
     IF EXISTS (
         SELECT 1 
         FROM inserted i
         INNER JOIN PV_Device d ON i.Device_ID = d.Device_ID
         WHERE d.Device_Type = '逆变器'
           AND i.Inverter_Eff < 85.00
-          AND d.Run_Status = '正常'  -- 只检查当前正常的设备
+          AND d.Run_Status = '正常'
     )
     BEGIN
-        -- 标记效率低于85%的逆变器为"异常"
+        -- 3. 执行更新：标记为异常，并更新时间
+        -- 注意：此处不再需要 CASE 判断，因为上方已确保列存在
         UPDATE PV_Device
         SET Run_Status = '异常',
-            -- 检查字段是否存在，如果不存在就不更新该字段
-            Last_Update_Time = CASE 
-                WHEN COLUMNPROPERTY(OBJECT_ID('PV_Device'), 'Last_Update_Time', 'ColumnId') IS NOT NULL 
-                THEN GETDATE() 
-                ELSE Last_Update_Time 
-            END
+            Last_Update_Time = GETDATE() 
         FROM PV_Device d
         INNER JOIN inserted i ON d.Device_ID = i.Device_ID
         WHERE d.Device_Type = '逆变器'
           AND i.Inverter_Eff < 85.00
-          AND d.Run_Status = '正常';  -- 避免重复更新
+          AND d.Run_Status = '正常';
         
         SET @UpdatedCount = @@ROWCOUNT;
         
+        -- 4. 输出提示信息
         IF @UpdatedCount > 0
         BEGIN
             PRINT '发现 ' + CAST(@UpdatedCount AS NVARCHAR(10)) + ' 个逆变器效率低于85%，已标记为异常状态';
             
-            -- 显示具体的异常设备信息（可选）
-            IF @UpdatedCount <= 10  -- 如果数量不多就显示详情
+            -- 显示前10条异常详情
+            IF @UpdatedCount <= 10 
             BEGIN
                 SELECT 
                     '异常设备告警' AS Alert_Type,
@@ -396,20 +400,20 @@ BEGIN
                 INNER JOIN PV_Device d ON i.Device_ID = d.Device_ID
                 WHERE d.Device_Type = '逆变器'
                   AND i.Inverter_Eff < 85.00
-                  AND d.Run_Status = '异常';  -- 确保是刚刚被更新的设备
+                  AND d.Run_Status = '异常'; 
             END
         END
     END
 END;
 GO
 
-PRINT '触发器 TR_Check_Inverter_Efficiency 创建完成（合并INSERT和UPDATE操作）';
+PRINT '触发器 TR_Check_Inverter_Efficiency 创建完成';
 GO
 
 PRINT 'Part 3: 触发器创建完成';
 GO
 
-PRINT '触发器+视图+存储过程 执行完毕';
+PRINT '========== 所有脚本执行完成 ==========';
 GO
 
 /* ============================================================
@@ -417,9 +421,30 @@ GO
    ============================================================ */
 
 -- 插入数据分析师数据（20条）
--- 先清空之前插入的分析师数据
-DELETE FROM Role_Analyst;
-DELETE FROM Sys_User WHERE Login_Account LIKE 'analyst%';
+-- 先删除之前的数据分析师数据
+DELETE FROM Data_PV_Forecast
+WHERE Analyst_ID IN (
+    SELECT Analyst_ID 
+    FROM Role_Analyst 
+    WHERE User_ID IN (
+        SELECT User_ID FROM Sys_User WHERE Login_Account LIKE 'analyst%'
+    )
+);
+DELETE FROM Sys_Role_Assignment
+WHERE User_ID IN (
+    SELECT User_ID 
+    FROM Sys_User 
+    WHERE Login_Account LIKE 'analyst%'
+);
+DELETE FROM Role_Analyst
+WHERE User_ID IN (
+    SELECT User_ID 
+    FROM Sys_User 
+    WHERE Login_Account LIKE 'analyst%'
+);
+DELETE FROM Sys_User 
+WHERE Login_Account LIKE 'analyst%';
+
 GO
 
 -- 插入Sys_User的部分数据
@@ -465,9 +490,8 @@ PRINT '已插入 ' + CAST(@@ROWCOUNT AS NVARCHAR(10)) + ' 个分析师角色';
 GO
 
 -- 1. 并网点表 (PV_Grid_Point)
--- 确保记录已清空
-DELETE FROM PV_Grid_Point;
-GO
+-- 适合数据库初始化的时候直接运行。
+
 -- 并网点编号插入时自动生成
 INSERT INTO PV_Grid_Point (Point_Name, Location) VALUES
 ('并网点01', '厂区A-屋顶光伏区'),
@@ -519,6 +543,12 @@ INSERT INTO PV_Device (Device_Type, Capacity, Run_Status, Install_Date, Protocol
 GO
 
 -- 3. 光伏预测模型表 (PV_Forecast_Model) - 相同模型名，不同版本
+DELETE FROM PV_Model_Alert;    -- 删除模型产生的报警
+DELETE FROM Data_PV_Forecast;  -- 删除模型产生的预测数据
+
+-- 2. 【核心】删除模型表本身
+DELETE FROM PV_Forecast_Model;
+
 INSERT INTO PV_Forecast_Model (Model_Version, Model_Name, Status, Update_Time) VALUES
 -- SUN系列模型
 ('SUN-V1.0.0', 'SUN光伏预测模型', 'Deprecated', '2023-08-01 10:00:00'),
@@ -624,3 +654,7 @@ INSERT INTO Data_PV_Gen (Device_ID, Collect_Time, Gen_KWH, Grid_KWH, Self_KWH, I
 (1, '2025-06-20 12:00:00', 29.200, 22.200, 7.000, 99.20, 1, 1, NULL, NULL, NULL),
 (1, '2025-06-21 12:00:00', 30.500, 23.500, 7.000, 99.50, 1, 1, NULL, NULL, NULL);
 GO
+
+PRINT '测试数据插入完毕。';
+GO
+

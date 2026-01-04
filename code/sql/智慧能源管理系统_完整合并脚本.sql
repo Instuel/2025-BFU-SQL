@@ -1568,51 +1568,92 @@ GO
    分布式光伏管理业务线 
    负责人：段泓冰
    ============================================================ */
+
+/* ============================================================
+   Part 1: 表结构修改
+   ============================================================ */
+
 -- 光伏预测模型表修改
 ALTER TABLE PV_Forecast_Model
 ADD CONSTRAINT CK_PV_Model_Status 
 CHECK (Status IN ('Active', 'Inactive', 'Testing', 'Deprecated', 'Training'));
 GO
 
-
 -- 光伏设备表修改
--- 1. 改通信协议字段
 ALTER TABLE PV_Device
 ADD CONSTRAINT CK_PV_Protocol 
 CHECK (Protocol IN ('RS485', 'Lora'));
 GO
 
--- 2. 修改 Run_Status 字段约束
--- 若存在旧约束 CK_PV_Status，则删除
+-- 检查是否存在旧的 CK_PV_Status 约束
+SELECT 
+    name AS ConstraintName,
+    definition AS CheckDefinition,
+    OBJECT_NAME(parent_object_id) AS TableName
+FROM sys.check_constraints
+WHERE OBJECT_NAME(parent_object_id) = 'PV_Device'
+  AND (name LIKE '%PV_Status%' OR name = 'CK_PV_Status');
+
+-- 如果有旧的约束，删除它
 IF EXISTS (
-    SELECT 1
-    FROM sys.check_constraints
-    WHERE parent_object_id = OBJECT_ID(N'dbo.PV_Device')
-      AND name = N'CK_PV_Status'
+    SELECT 1 
+    FROM sys.check_constraints 
+    WHERE parent_object_id = OBJECT_ID('PV_Device') 
+      AND name = 'CK_PV_Status'
 )
 BEGIN
-    ALTER TABLE dbo.PV_Device DROP CONSTRAINT CK_PV_Status;
+    ALTER TABLE PV_Device DROP CONSTRAINT CK_PV_Status;
+    PRINT '已删除旧的 CK_PV_Status 约束';
+END
+
+-- 修改Run_Status字段检查约束，增加"异常"选项
+IF EXISTS (
+    SELECT * 
+    FROM sys.check_constraints cc
+    JOIN sys.objects o ON cc.parent_object_id = o.object_id
+    WHERE o.name = 'PV_Device' 
+      AND cc.name LIKE '%Run_Status%'
+)
+BEGIN
+    -- 先删除现有的检查约束
+    DECLARE @ConstraintName NVARCHAR(128);
+    
+    SELECT TOP 1 @ConstraintName = cc.name
+    FROM sys.check_constraints cc
+    JOIN sys.objects o ON cc.parent_object_id = o.object_id
+    WHERE o.name = 'PV_Device' 
+      AND cc.name LIKE '%Run_Status%';
+    
+    IF @ConstraintName IS NOT NULL
+    BEGIN
+        EXEC('ALTER TABLE PV_Device DROP CONSTRAINT ' + @ConstraintName);
+        PRINT '已删除原有的Run_Status约束: ' + @ConstraintName;
+    END
 END
 GO
 
--- 若已存在同名新约束，删除
-IF EXISTS (
-    SELECT 1
-    FROM sys.check_constraints
-    WHERE parent_object_id = OBJECT_ID(N'dbo.PV_Device')
-      AND name = N'CK_PV_Device_Run_Status'
+-- 添加新的检查约束，包含"异常"状态
+ALTER TABLE PV_Device
+ADD CONSTRAINT CK_PV_Device_Run_Status 
+CHECK (Run_Status IN ('正常', '故障', '离线', '异常'));
+GO
+
+PRINT '已为PV_Device表添加"异常"状态选项';
+GO
+
+-- 检查并添加 Last_Update_Time 字段（如果需要）
+IF NOT EXISTS (
+    SELECT 1 
+    FROM sys.columns 
+    WHERE object_id = OBJECT_ID('PV_Device') 
+      AND name = 'Last_Update_Time'
 )
 BEGIN
-    ALTER TABLE dbo.PV_Device DROP CONSTRAINT CK_PV_Device_Run_Status;
+    ALTER TABLE PV_Device
+    ADD Last_Update_Time DATETIME NULL DEFAULT GETDATE();
+    PRINT '已为PV_Device表添加Last_Update_Time字段';
 END
 GO
-
--- 添加新的检查约束
-ALTER TABLE dbo.PV_Device
-ADD CONSTRAINT CK_PV_Device_Run_Status
-CHECK (Run_Status IN (N'正常', N'故障', N'离线', N'异常'));
-GO
-
 
 -- 光伏发电数据表修改
 -- 1. 添加字段
@@ -1633,9 +1674,8 @@ BEGIN
 END
 GO
 
-
 -- 光伏预测数据表修改
--- 先添加计算列
+-- 注意：先添加计算列
 ALTER TABLE Data_PV_Forecast
 ADD Deviation_Rate AS (
     CASE 
@@ -1646,108 +1686,7 @@ ADD Deviation_Rate AS (
 ) PERSISTED;
 GO
 
-
-PRINT '分布式光伏管理业务线 表结构修改完成';
-GO
-
-/* ============================================================
-   最后一步：生成数据库变更汇总报告
-   功能：输出本次脚本涉及的所有业务线变更项摘要
-   ============================================================ */
-
-PRINT '正在生成变更汇总报告...';
-GO
-
-USE SQL_BFU;
-GO
-
-/* ============================================================
-   第一部分：执行 DDL/DML 操作 (建表、插数、加约束)
-   注意：这部分必须在生成报告之前执行完毕
-   ============================================================ */
-
--- 1. 创建 Exec_Decision_Item 表
-IF OBJECT_ID('dbo.Exec_Decision_Item', 'U') IS NULL
-BEGIN
-    EXEC(N'
-        CREATE TABLE dbo.Exec_Decision_Item (
-            Decision_ID BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Exec_Decision PRIMARY KEY,
-            Decision_Type NVARCHAR(20) NOT NULL,
-            Title NVARCHAR(100) NOT NULL,
-            Description NVARCHAR(200) NULL,
-            Status NVARCHAR(20) NULL,
-            Alarm_ID BIGINT NULL,
-            Estimate_Cost DECIMAL(12,2) NULL,
-            Expected_Saving DECIMAL(12,2) NULL,
-            Created_Time DATETIME2(0) NULL,
-
-            CONSTRAINT FK_Decision_Alarm FOREIGN KEY (Alarm_ID) REFERENCES Alarm_Info(Alarm_ID)
-        );
-    ');
-END
-GO
-
--- 2. 创建 Maintenance_Plan 表
-IF OBJECT_ID('dbo.Maintenance_Plan', 'U') IS NULL
-BEGIN
-    EXEC(N'
-        CREATE TABLE dbo.Maintenance_Plan (
-            Plan_ID      BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Maintenance_Plan PRIMARY KEY,
-            Ledger_ID    BIGINT NULL,
-            Plan_Type    NVARCHAR(50) NULL,
-            Plan_Content NVARCHAR(500) NULL,
-            Plan_Date    DATE NULL,
-            Owner_Name   NVARCHAR(50) NULL,
-            Status       NVARCHAR(20) NULL,
-            Created_At   DATETIME2(0) NULL
-        );
-    ');
-END;
-GO
-
--- 3. 创建 Research_Project 表
-IF OBJECT_ID('dbo.Research_Project', 'U') IS NULL
-BEGIN
-    EXEC(N'
-        CREATE TABLE dbo.Research_Project (
-            Project_ID BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Research_Project PRIMARY KEY,
-            Project_Title NVARCHAR(100) NOT NULL,
-            Project_Summary NVARCHAR(500) NULL,
-            Applicant NVARCHAR(50) NULL,
-            Apply_Date DATETIME2(0) NULL,
-            Project_Status NVARCHAR(20) NULL,
-            Close_Report NVARCHAR(500) NULL,
-            Close_Date DATETIME2(0) NULL
-        );
-    ');
-END;
-GO
-
--- 4. 插入测试数据
-IF NOT EXISTS (SELECT 1 FROM dbo.Exec_Decision_Item)
-BEGIN
-    INSERT INTO dbo.Exec_Decision_Item (Decision_Type, Title, Description, Status, Estimate_Cost, Expected_Saving, Created_Time)
-    VALUES
-    (N'维修', N'35KV 配电房故障', N'主变温度异常，建议紧急检修并制定预算。', N'待决策', 480000, NULL, SYSDATETIME()),
-    (N'改造', N'空压系统节能改造', N'预估节能 12%，建议纳入年度节能计划。', N'待决策', 320000, 120000, SYSDATETIME());
-END;
-
-IF NOT EXISTS (SELECT 1 FROM dbo.Research_Project)
-BEGIN
-    INSERT INTO dbo.Research_Project (Project_Title, Project_Summary, Applicant, Apply_Date, Project_Status)
-    VALUES
-    (N'光伏智能预测项目', N'提升光伏预测精度，支撑自用电收益提升。', N'管理层', SYSDATETIME(), N'申报中'),
-    (N'能耗优化示范项目', N'围绕高耗能设备开展节能改造示范。', N'管理层', SYSDATETIME(), N'结题中');
-END;
-GO
-
--- 5. 补全外键约束
-IF COL_LENGTH('dbo.Maintenance_Plan','Ledger_ID') IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name='FK_Maintenance_Plan_Ledger' AND parent_object_id=OBJECT_ID('dbo.Maintenance_Plan'))
-BEGIN
-    EXEC(N'ALTER TABLE dbo.Maintenance_Plan WITH NOCHECK
-           ADD CONSTRAINT FK_Maintenance_Plan_Ledger FOREIGN KEY (Ledger_ID) REFERENCES dbo.Device_Ledger(Ledger_ID);');
-END;
+PRINT 'Part 1: 表结构修改完成';
 GO
 
 
