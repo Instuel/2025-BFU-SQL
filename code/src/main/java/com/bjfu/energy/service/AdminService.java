@@ -113,16 +113,47 @@ public class AdminService {
         if (backupType == null || backupType.trim().isEmpty()) {
             throw new IllegalArgumentException("备份类型不能为空");
         }
+
         BackupLog log = new BackupLog();
         log.setBackupType(backupType.trim());
         log.setBackupPath(backupPath == null ? null : backupPath.trim());
-        log.setStatus(status == null || status.trim().isEmpty() ? "成功" : status.trim());
         log.setOperatorId(operatorId);
         log.setStartTime(LocalDateTime.now());
-        log.setEndTime(LocalDateTime.now());
-        log.setRemark(remark == null ? null : remark.trim());
-        adminDao.insertBackupLog(log);
-        writeAuditLog("备份/恢复", "执行 " + backupType + " 任务", operatorId);
+
+        boolean success = false;
+        String finalStatus = (status == null || status.trim().isEmpty()) ? null : status.trim();
+        String finalRemark = remark == null ? null : remark.trim();
+
+        try {
+            // 真正执行备份/恢复动作
+            if ("全量备份".equals(backupType)) {
+                adminDao.executeFullBackup(log.getBackupPath());
+            } else if ("增量备份".equals(backupType)) {
+                adminDao.executeDiffBackup(log.getBackupPath());
+            } else if ("恢复演练".equals(backupType)) {
+                adminDao.executeRestoreVerify(log.getBackupPath());
+            }
+            success = true;
+        } catch (Exception e) {
+            // 失败时在备注中追加错误信息
+            StringBuilder sb = new StringBuilder();
+            if (finalRemark != null && !finalRemark.isEmpty()) {
+                sb.append(finalRemark).append("；");
+            }
+            sb.append("执行失败: ").append(e.getMessage());
+            finalRemark = sb.toString();
+            finalStatus = "失败";
+            throw e;
+        } finally {
+            log.setEndTime(LocalDateTime.now());
+            if (finalStatus == null || finalStatus.isEmpty()) {
+                finalStatus = success ? "成功" : "失败";
+            }
+            log.setStatus(finalStatus);
+            log.setRemark(finalRemark);
+            adminDao.insertBackupLog(log);
+            writeAuditLog("备份/恢复", "执行 " + backupType + " 任务", operatorId);
+        }
     }
 
     public List<AdminAuditLog> listAuditLogs() throws Exception {
