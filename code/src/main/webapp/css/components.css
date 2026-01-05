@@ -389,6 +389,15 @@
     background: #f8fafc;
 }
 
+.table tr.highlight-row td {
+    background: #fef2f2;
+    border-left: 3px solid #ef4444;
+}
+
+.table tr.highlight-row:hover td {
+    background: #fee2e2;
+}
+
 /* ======================= */
 /* 列表组件               */
 /* ======================= */

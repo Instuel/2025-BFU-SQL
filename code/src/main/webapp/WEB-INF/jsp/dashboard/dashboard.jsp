@@ -16,8 +16,7 @@
           <p>统一管理用户权限、告警规则与数据运维，保障平台稳定运行。</p>
         </div>
 
-        <a class="admin-module-link" href="${ctx}/admin?action=list">
-<div class="admin-module-card">
+        <div class="admin-module-card">
           <div class="admin-module-icon rbac">👥</div>
           <div class="admin-module-title">账号与权限维护</div>
           <div class="admin-module-desc">维护全员账号信息、角色分配与负责区域限制，确保权限最小化。</div>
@@ -32,10 +31,8 @@
             </div>
           </div>
         </div>
-</a>
 
-        <a class="admin-module-link" href="${ctx}/admin?action=alarm_rule">
-<div class="admin-module-card">
+        <div class="admin-module-card">
           <div class="admin-module-icon alarm">🚨</div>
           <div class="admin-module-title">告警规则配置</div>
           <div class="admin-module-desc">调整设备温度阈值、峰谷时段与告警升级逻辑，提升响应效率。</div>
@@ -50,10 +47,8 @@
             </div>
           </div>
         </div>
-</a>
 
-        <a class="admin-module-link" href="${ctx}/admin?action=peak_valley">
-<div class="admin-module-card">
+        <div class="admin-module-card">
           <div class="admin-module-icon param">🧭</div>
           <div class="admin-module-title">峰谷与参数配置</div>
           <div class="admin-module-desc">维护峰谷电价时段、设备运行参数与能耗核算规则。</div>
@@ -68,10 +63,8 @@
             </div>
           </div>
         </div>
-</a>
 
-        <a class="admin-module-link" href="${ctx}/admin?action=backup_restore">
-<div class="admin-module-card">
+        <div class="admin-module-card">
           <div class="admin-module-icon db">💾</div>
           <div class="admin-module-title">数据备份与恢复</div>
           <div class="admin-module-desc">执行备份策略与恢复演练，监控数据库容量与查询性能。</div>
@@ -86,51 +79,25 @@
             </div>
           </div>
         </div>
-</a>
 
         <div class="admin-system-status">
           <div class="admin-section-title">系统运行状态</div>
           <div class="admin-status-grid">
             <div class="admin-status-item normal">
               <div class="admin-status-label">数据库响应时间</div>
-              <div class="admin-status-value">
-                <c:choose>
-                  <c:when test="${not empty dbLatencyMs}">
-                    ${dbLatencyMs} ms
-                  </c:when>
-                  <c:otherwise>--</c:otherwise>
-                </c:choose>
-              </div>
+              <div class="admin-status-value">168 ms</div>
             </div>
             <div class="admin-status-item normal">
               <div class="admin-status-label">接口可用率</div>
-              <div class="admin-status-value">
-                <c:choose>
-                  <c:when test="${not empty apiAvailability}">
-                    <fmt:formatNumber value="${apiAvailability}" minFractionDigits="2" maxFractionDigits="2"/>%
-                  </c:when>
-                  <c:otherwise>--</c:otherwise>
-                </c:choose>
-              </div>
+              <div class="admin-status-value">99.92%</div>
             </div>
             <div class="admin-status-item warning">
               <div class="admin-status-label">磁盘占用</div>
-              <div class="admin-status-value">
-                <c:choose>
-                  <c:when test="${not empty diskUsagePercent}">
-                    <fmt:formatNumber value="${diskUsagePercent}" minFractionDigits="1" maxFractionDigits="1"/>%
-                    /
-                    <fmt:formatNumber value="${diskTotalGb}" minFractionDigits="1" maxFractionDigits="1"/> GB
-                  </c:when>
-                  <c:otherwise>--</c:otherwise>
-                </c:choose>
-              </div>
+              <div class="admin-status-value">72% / 1.4 TB</div>
             </div>
             <div class="admin-status-item normal">
               <div class="admin-status-label">备份最近执行</div>
-              <div class="admin-status-value">
-                <c:out value="${latestBackupTime}" default="--"/>
-              </div>
+              <div class="admin-status-value">2025-03-18 02:00</div>
             </div>
           </div>
         </div>
@@ -521,19 +488,18 @@
               <div class="dashboard-section-hint">对比预测值与实际值差异，追踪模型优化效果。</div>
             </div>
             <div class="dashboard-chart-actions">
-              <span class="dashboard-badge">偏差阈值：±15%</span>
-              <a class="dashboard-chart-action-btn" href="${ctx}/app?module=pv&view=forecast_list">查看详情</a>
+              <span class="dashboard-badge">偏差阈值：±6%</span>
+              <span class="dashboard-badge">最新评估：2025-03-18</span>
             </div>
           </div>
           <div class="table-container">
             <table class="data-table">
               <thead>
               <tr>
-                <th>并网点</th>
-                <th>最新预测值</th>
-                <th>最新实际值</th>
-                <th>最新偏差</th>
-                <th>平均偏差</th>
+                <th>场站</th>
+                <th>预测值</th>
+                <th>实际值</th>
+                <th>偏差</th>
                 <th>影响因素</th>
                 <th>优化建议</th>
               </tr>
@@ -566,21 +532,13 @@
                       <c:otherwise>--</c:otherwise>
                     </c:choose>
                   </td>
-                  <td>
-                    <c:choose>
-                      <c:when test="${not empty insight.avgDeviationRate}">
-                        <fmt:formatNumber value="${insight.avgDeviationRate}" minFractionDigits="1" maxFractionDigits="1"/>%
-                      </c:when>
-                      <c:otherwise>--</c:otherwise>
-                    </c:choose>
-                  </td>
                   <td><c:out value="${insight.weatherFactor}" default="--"/></td>
                   <td><c:out value="${insight.optimizationAdvice}" default="--"/></td>
                 </tr>
               </c:forEach>
               <c:if test="${empty forecastInsights}">
                 <tr>
-                  <td colspan="7" style="text-align:center;color:#94a3b8;">暂无预测偏差分析数据</td>
+                  <td colspan="6" style="text-align:center;color:#94a3b8;">暂无预测偏差分析数据</td>
                 </tr>
               </c:if>
               </tbody>
@@ -723,7 +681,6 @@
             <div class="dashboard-meta-item">月度能耗总结：<c:out value="${execOverview.monthLabel}"/></div>
             <div class="dashboard-meta-item">高等级告警：<c:out value="${execOverview.alarmHighCount}"/> 条</div>
             <div class="dashboard-meta-item">科研项目：<c:out value="${execOverview.pendingProjectCount}"/> 项待跟进</div>
-            <div class="dashboard-meta-item">实时刷新：<c:out value="${execRealtime.statTime}"/></div>
           </div>
         </div>
 

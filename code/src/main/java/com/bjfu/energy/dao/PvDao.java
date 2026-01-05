@@ -55,47 +55,25 @@ public class PvDao {
     }
 
     public List<Map<String, Object>> listDevices() throws Exception {
-        return listDevices(null, null);
-    }
-
-    public List<Map<String, Object>> listDevices(String sortBy, String sortOrder) throws Exception {
-        StringBuilder sql = new StringBuilder();
-        sql.append("SELECT d.Device_ID AS deviceId, ")
-           .append("COALESCE(l.Device_Name, CONCAT('PV-', d.Device_ID)) AS deviceCode, ")
-           .append("d.Device_Type AS deviceType, d.Capacity AS capacity, d.Run_Status AS runStatus, ")
-           .append("d.Protocol AS protocol, p.Point_Name AS pointName, ")
-           .append("g.Gen_KWH AS genKwh, g.Grid_KWH AS gridKwh, g.Self_KWH AS selfKwh, ")
-           .append("g.Inverter_Eff AS inverterEff, ")
-           .append("g.Collect_Time AS collectTimeRaw, ")
-           .append("CONVERT(VARCHAR(16), g.Collect_Time, 120) AS collectTime ")
-           .append("FROM PV_Device d ")
-           .append("JOIN PV_Grid_Point p ON d.Point_ID = p.Point_ID ")
-           .append("LEFT JOIN Device_Ledger l ON d.Ledger_ID = l.Ledger_ID ")
-           .append("OUTER APPLY ( ")
-           .append("  SELECT TOP 1 Gen_KWH, Grid_KWH, Self_KWH, Inverter_Eff, Collect_Time ")
-           .append("  FROM Data_PV_Gen g WHERE g.Device_ID = d.Device_ID ")
-           .append("  ORDER BY Collect_Time DESC ")
-           .append(") g ");
-
-        // 排序字段映射
-        String orderColumn = "d.Device_ID";
-        if ("deviceCode".equals(sortBy)) {
-            // 提取设备编号中-后面的数字进行数值排序
-            orderColumn = "CAST(SUBSTRING(COALESCE(l.Device_Name, CONCAT('PV-', d.Device_ID)), CHARINDEX('-', COALESCE(l.Device_Name, CONCAT('PV-', d.Device_ID))) + 1, LEN(COALESCE(l.Device_Name, CONCAT('PV-', d.Device_ID)))) AS INT)";
-        } else if ("collectTime".equals(sortBy)) {
-            orderColumn = "g.Collect_Time";
-        } else if ("capacity".equals(sortBy)) {
-            orderColumn = "d.Capacity";
-        } else if ("deviceType".equals(sortBy)) {
-            orderColumn = "d.Device_Type";
-        }
-
-        String order = "DESC".equalsIgnoreCase(sortOrder) ? "DESC" : "ASC";
-        sql.append("ORDER BY ").append(orderColumn).append(" ").append(order);
-
+        String sql = "SELECT d.Device_ID AS deviceId, " +
+                     "COALESCE(l.Device_Name, CONCAT('PV-', d.Device_ID)) AS deviceCode, " +
+                     "d.Device_Type AS deviceType, d.Capacity AS capacity, d.Run_Status AS runStatus, " +
+                     "d.Protocol AS protocol, p.Point_Name AS pointName, " +
+                     "g.Gen_KWH AS genKwh, g.Grid_KWH AS gridKwh, g.Self_KWH AS selfKwh, " +
+                     "g.Inverter_Eff AS inverterEff, " +
+                     "CONVERT(VARCHAR(16), g.Collect_Time, 120) AS collectTime " +
+                     "FROM PV_Device d " +
+                     "JOIN PV_Grid_Point p ON d.Point_ID = p.Point_ID " +
+                     "LEFT JOIN Device_Ledger l ON d.Ledger_ID = l.Ledger_ID " +
+                     "OUTER APPLY ( " +
+                     "  SELECT TOP 1 Gen_KWH, Grid_KWH, Self_KWH, Inverter_Eff, Collect_Time " +
+                     "  FROM Data_PV_Gen g WHERE g.Device_ID = d.Device_ID " +
+                     "  ORDER BY Collect_Time DESC " +
+                     ") g " +
+                     "ORDER BY d.Device_ID DESC";
         List<Map<String, Object>> devices = new ArrayList<>();
         try (Connection conn = DBUtil.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql.toString());
+             PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 devices.add(mapRow(rs));
@@ -181,7 +159,8 @@ public class PvDao {
         sql.append("SELECT f.Forecast_ID AS forecastId, p.Point_Name AS pointName, ")
            .append("f.Forecast_Date AS forecastDate, f.Time_Slot AS timeSlot, ")
            .append("f.Forecast_Val AS forecastVal, f.Actual_Val AS actualVal, ")
-           .append("f.Deviation_Rate AS deviationRate, ")
+           .append("CASE WHEN f.Actual_Val IS NULL OR f.Actual_Val = 0 THEN NULL ")
+           .append("ELSE (f.Forecast_Val - f.Actual_Val) / f.Actual_Val END AS deviationRate, ")
            .append("m.Model_Name AS modelName, f.Model_Version AS modelVersion ")
            .append("FROM Data_PV_Forecast f ")
            .append("JOIN PV_Grid_Point p ON f.Point_ID = p.Point_ID ")
@@ -212,7 +191,8 @@ public class PvDao {
         String sql = "SELECT TOP 1 f.Forecast_ID AS forecastId, p.Point_Name AS pointName, " +
                      "f.Forecast_Date AS forecastDate, f.Time_Slot AS timeSlot, " +
                      "f.Forecast_Val AS forecastVal, f.Actual_Val AS actualVal, " +
-                     "f.Deviation_Rate AS deviationRate, " +
+                     "CASE WHEN f.Actual_Val IS NULL OR f.Actual_Val = 0 THEN NULL " +
+                     "ELSE (f.Forecast_Val - f.Actual_Val) / f.Actual_Val END AS deviationRate, " +
                      "m.Model_Name AS modelName, f.Model_Version AS modelVersion " +
                      "FROM Data_PV_Forecast f " +
                      "JOIN PV_Grid_Point p ON f.Point_ID = p.Point_ID " +
@@ -231,34 +211,18 @@ public class PvDao {
     }
 
     public List<Map<String, Object>> listModelAlerts() throws Exception {
-        return listModelAlerts(null);
-    }
-
-    public List<Map<String, Object>> listModelAlerts(String statusFilter) throws Exception {
-        StringBuilder sql = new StringBuilder();
-        sql.append("SELECT a.Alert_ID AS alertId, p.Point_Name AS pointName, ")
-           .append("CONVERT(VARCHAR(19), a.Trigger_Time, 120) AS triggerTime, ")
-           .append("a.Remark AS remark, a.Process_Status AS processStatus, a.Model_Version AS modelVersion ")
-           .append("FROM PV_Model_Alert a ")
-           .append("JOIN PV_Grid_Point p ON a.Point_ID = p.Point_ID ");
-        
-        List<Object> params = new ArrayList<>();
-        if (statusFilter != null && !statusFilter.trim().isEmpty()) {
-            sql.append("WHERE a.Process_Status LIKE ? ");
-            params.add("%" + statusFilter.trim() + "%");
-        }
-        sql.append("ORDER BY a.Trigger_Time DESC");
-        
+        String sql = "SELECT a.Alert_ID AS alertId, p.Point_Name AS pointName, " +
+                     "CONVERT(VARCHAR(19), a.Trigger_Time, 120) AS triggerTime, " +
+                     "a.Remark AS remark, a.Process_Status AS processStatus, a.Model_Version AS modelVersion " +
+                     "FROM PV_Model_Alert a " +
+                     "JOIN PV_Grid_Point p ON a.Point_ID = p.Point_ID " +
+                     "ORDER BY a.Trigger_Time DESC";
         List<Map<String, Object>> items = new ArrayList<>();
         try (Connection conn = DBUtil.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
-            for (int i = 0; i < params.size(); i++) {
-                ps.setObject(i + 1, params.get(i));
-            }
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    items.add(mapRow(rs));
-                }
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                items.add(mapRow(rs));
             }
         }
         return items;

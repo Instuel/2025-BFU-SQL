@@ -7,12 +7,14 @@ public class WorkOrder {
     private Long orderId;
     private Long alarmId;
     private Long oandmId;
+    private Long dispatcherId;
     private Long ledgerId;
     private LocalDateTime dispatchTime;
     private LocalDateTime responseTime;
     private LocalDateTime finishTime;
     private String resultDesc;
     private String reviewStatus;
+    private String reviewFeedback;
     private String attachmentPath;
 
     private String alarmLevel;
@@ -21,6 +23,7 @@ public class WorkOrder {
     private String alarmStatus;
     private String deviceName;
     private String deviceType;
+    private String oandmName;
     private boolean responseOverdue;
 
     public Long getOrderId() {
@@ -45,6 +48,14 @@ public class WorkOrder {
 
     public void setOandmId(Long oandmId) {
         this.oandmId = oandmId;
+    }
+
+    public Long getDispatcherId() {
+        return dispatcherId;
+    }
+
+    public void setDispatcherId(Long dispatcherId) {
+        this.dispatcherId = dispatcherId;
     }
 
     public Long getLedgerId() {
@@ -93,6 +104,14 @@ public class WorkOrder {
 
     public void setReviewStatus(String reviewStatus) {
         this.reviewStatus = reviewStatus;
+    }
+
+    public String getReviewFeedback() {
+        return reviewFeedback;
+    }
+
+    public void setReviewFeedback(String reviewFeedback) {
+        this.reviewFeedback = reviewFeedback;
     }
 
     public String getAttachmentPath() {
@@ -149,6 +168,14 @@ public class WorkOrder {
 
     public void setDeviceType(String deviceType) {
         this.deviceType = deviceType;
+    }
+
+    public String getOandmName() {
+        return oandmName;
+    }
+
+    public void setOandmName(String oandmName) {
+        this.oandmName = oandmName;
     }
 
     public boolean isResponseOverdue() {

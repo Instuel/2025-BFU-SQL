@@ -59,16 +59,6 @@
     <url-pattern>/app/*</url-pattern>
   </servlet-mapping>
 
-  <!-- 企业管理层大屏 API（业务线5：自定义/分钟级刷新） -->
-  <servlet>
-    <servlet-name>ExecDashboardServlet</servlet-name>
-    <servlet-class>com.bjfu.energy.controller.ExecDashboardServlet</servlet-class>
-  </servlet>
-  <servlet-mapping>
-    <servlet-name>ExecDashboardServlet</servlet-name>
-    <url-pattern>/execDashboard</url-pattern>
-  </servlet-mapping>
-
   <!-- 系统管理员 Servlet：账号管理 -->
   <servlet>
     <servlet-name>AdminServlet</servlet-name>
@@ -107,6 +97,34 @@
   <servlet-mapping>
     <servlet-name>AlarmServlet</servlet-name>
     <url-pattern>/alarm/*</url-pattern>
+  </servlet-mapping>
+
+  <!-- 运维工单管理员 Servlet -->
+  <servlet>
+    <servlet-name>DispatcherServlet</servlet-name>
+    <servlet-class>com.bjfu.energy.controller.DispatcherServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>DispatcherServlet</servlet-name>
+    <url-pattern>/dispatcher</url-pattern>
+  </servlet-mapping>
+  <servlet-mapping>
+    <servlet-name>DispatcherServlet</servlet-name>
+    <url-pattern>/dispatcher/*</url-pattern>
+  </servlet-mapping>
+
+  <!-- 业务视图查看 Servlet -->
+  <servlet>
+    <servlet-name>ViewServlet</servlet-name>
+    <servlet-class>com.bjfu.energy.controller.ViewServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>ViewServlet</servlet-name>
+    <url-pattern>/view</url-pattern>
+  </servlet-mapping>
+  <servlet-mapping>
+    <servlet-name>ViewServlet</servlet-name>
+    <url-pattern>/view/*</url-pattern>
   </servlet-mapping>
 
   <welcome-file-list>

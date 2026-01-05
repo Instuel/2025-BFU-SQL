@@ -24,15 +24,15 @@ public class AdminDao {
 
     public List<RoleAssignmentView> listRoleAssignments() throws Exception {
         String sql = "SELECT u.User_ID, u.Login_Account, u.Real_Name, u.Department, u.Account_Status, " +
-                "       a.Role_Type, a.Assigned_Time " +
-                "FROM Sys_User u " +
-                "OUTER APPLY ( " +
-                "    SELECT TOP 1 Role_Type, Assigned_Time " +
-                "    FROM Sys_Role_Assignment a " +
-                "    WHERE a.User_ID = u.User_ID " +
-                "    ORDER BY a.Assigned_Time DESC, a.Assignment_ID DESC " +
-                ") a " +
-                "ORDER BY u.User_ID";
+                     "       a.Role_Type, a.Assigned_Time " +
+                     "FROM Sys_User u " +
+                     "OUTER APPLY ( " +
+                     "    SELECT TOP 1 Role_Type, Assigned_Time " +
+                     "    FROM Sys_Role_Assignment a " +
+                     "    WHERE a.User_ID = u.User_ID " +
+                     "    ORDER BY a.Assigned_Time DESC, a.Assignment_ID DESC " +
+                     ") a " +
+                     "ORDER BY u.User_ID";
         List<RoleAssignmentView> result = new ArrayList<>();
         try (Connection conn = DBUtil.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
@@ -83,7 +83,7 @@ public class AdminDao {
 
     public List<PermissionSummary> listPermissions() throws Exception {
         String permSql = "SELECT Perm_Code, Perm_Name, Module, Uri_Pattern, Is_Enabled " +
-                "FROM Sys_Permission ORDER BY Module, Perm_Code";
+                         "FROM Sys_Permission ORDER BY Module, Perm_Code";
         String roleSql = "SELECT Perm_Code, Role_Type FROM Sys_Role_Permission";
 
         Map<String, PermissionSummary> map = new LinkedHashMap<>();
@@ -132,8 +132,8 @@ public class AdminDao {
 
     public List<AlarmRule> listAlarmRules() throws Exception {
         String sql = "SELECT Rule_ID, Alarm_Type, Alarm_Level, Threshold_Value, Threshold_Unit, " +
-                "Notify_Channel, Is_Enabled, Updated_Time " +
-                "FROM Sys_Alarm_Rule ORDER BY Rule_ID DESC";
+                     "Notify_Channel, Is_Enabled, Updated_Time " +
+                     "FROM Sys_Alarm_Rule ORDER BY Rule_ID DESC";
         List<AlarmRule> rules = new ArrayList<>();
         try (Connection conn = DBUtil.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
@@ -164,7 +164,7 @@ public class AdminDao {
     public void saveAlarmRule(AlarmRule rule) throws Exception {
         if (rule.getRuleId() == null) {
             String sql = "INSERT INTO Sys_Alarm_Rule (Alarm_Type, Alarm_Level, Threshold_Value, Threshold_Unit, " +
-                    "Notify_Channel, Is_Enabled) VALUES (?, ?, ?, ?, ?, ?)";
+                         "Notify_Channel, Is_Enabled) VALUES (?, ?, ?, ?, ?, ?)";
             try (Connection conn = DBUtil.getConnection();
                  PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, rule.getAlarmType());
@@ -181,8 +181,8 @@ public class AdminDao {
             }
         } else {
             String sql = "UPDATE Sys_Alarm_Rule SET Alarm_Type = ?, Alarm_Level = ?, Threshold_Value = ?, " +
-                    "Threshold_Unit = ?, Notify_Channel = ?, Is_Enabled = ?, Updated_Time = SYSDATETIME() " +
-                    "WHERE Rule_ID = ?";
+                         "Threshold_Unit = ?, Notify_Channel = ?, Is_Enabled = ?, Updated_Time = SYSDATETIME() " +
+                         "WHERE Rule_ID = ?";
             try (Connection conn = DBUtil.getConnection();
                  PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, rule.getAlarmType());
@@ -213,7 +213,7 @@ public class AdminDao {
 
     public List<PeakValleyConfig> listPeakValleyConfigs() throws Exception {
         String sql = "SELECT Config_ID, Time_Type, Start_Time, End_Time, Price_Rate " +
-                "FROM Config_PeakValley ORDER BY Start_Time";
+                     "FROM Config_PeakValley ORDER BY Start_Time";
         List<PeakValleyConfig> configs = new ArrayList<>();
         try (Connection conn = DBUtil.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
@@ -234,51 +234,24 @@ public class AdminDao {
     }
 
     public void savePeakValleyConfig(PeakValleyConfig config) throws Exception {
-        // 如果已存在相同 Time_Type 的配置，则执行更新；否则插入新记录
-        String querySql = "SELECT Config_ID FROM Config_PeakValley WHERE Time_Type = ?";
+        String sql = "INSERT INTO Config_PeakValley (Time_Type, Start_Time, End_Time, Price_Rate) VALUES (?, ?, ?, ?)";
         try (Connection conn = DBUtil.getConnection();
-             PreparedStatement queryPs = conn.prepareStatement(querySql)) {
-            queryPs.setString(1, config.getTimeType());
-            try (ResultSet rs = queryPs.executeQuery()) {
-                if (rs.next()) {
-                    // 已存在该时段类型，执行 UPDATE
-                    String updateSql = "UPDATE Config_PeakValley "
-                                     + "SET Start_Time = ?, End_Time = ?, Price_Rate = ? "
-                                     + "WHERE Time_Type = ?";
-                    try (PreparedStatement ps = conn.prepareStatement(updateSql)) {
-                        ps.setTime(1, config.getStartTime() == null ? null : Time.valueOf(config.getStartTime()));
-                        ps.setTime(2, config.getEndTime() == null ? null : Time.valueOf(config.getEndTime()));
-                        if (config.getPriceRate() == null) {
-                            ps.setNull(3, java.sql.Types.DECIMAL);
-                        } else {
-                            ps.setBigDecimal(3, config.getPriceRate());
-                        }
-                        ps.setString(4, config.getTimeType());
-                        ps.executeUpdate();
-                    }
-                } else {
-                    // 不存在则插入
-                    String insertSql = "INSERT INTO Config_PeakValley (Time_Type, Start_Time, End_Time, Price_Rate) "
-                                     + "VALUES (?, ?, ?, ?)";
-                    try (PreparedStatement ps = conn.prepareStatement(insertSql)) {
-                        ps.setString(1, config.getTimeType());
-                        ps.setTime(2, config.getStartTime() == null ? null : Time.valueOf(config.getStartTime()));
-                        ps.setTime(3, config.getEndTime() == null ? null : Time.valueOf(config.getEndTime()));
-                        if (config.getPriceRate() == null) {
-                            ps.setNull(4, java.sql.Types.DECIMAL);
-                        } else {
-                            ps.setBigDecimal(4, config.getPriceRate());
-                        }
-                        ps.executeUpdate();
-                    }
-                }
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, config.getTimeType());
+            ps.setTime(2, config.getStartTime() == null ? null : Time.valueOf(config.getStartTime()));
+            ps.setTime(3, config.getEndTime() == null ? null : Time.valueOf(config.getEndTime()));
+            if (config.getPriceRate() == null) {
+                ps.setNull(4, java.sql.Types.DECIMAL);
+            } else {
+                ps.setBigDecimal(4, config.getPriceRate());
             }
+            ps.executeUpdate();
         }
     }
 
     public List<BackupLog> listBackupLogs() throws Exception {
         String sql = "SELECT Backup_ID, Backup_Type, Backup_Path, Status, Operator_ID, Start_Time, End_Time, Remark " +
-                "FROM Sys_Backup_Log ORDER BY Start_Time DESC";
+                     "FROM Sys_Backup_Log ORDER BY Start_Time DESC";
         List<BackupLog> logs = new ArrayList<>();
         try (Connection conn = DBUtil.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
@@ -308,7 +281,7 @@ public class AdminDao {
 
     public void insertBackupLog(BackupLog log) throws Exception {
         String sql = "INSERT INTO Sys_Backup_Log (Backup_Type, Backup_Path, Status, Operator_ID, Start_Time, End_Time, Remark) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?)";
+                     "VALUES (?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = DBUtil.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, log.getBackupType());
@@ -334,54 +307,9 @@ public class AdminDao {
         }
     }
 
-    /**
-     * 执行全量备份。仅用于演示，不处理复杂权限与路径校验。
-     */
-    public void executeFullBackup(String backupPath) throws Exception {
-        if (backupPath == null || backupPath.trim().isEmpty()) {
-            throw new IllegalArgumentException("备份文件路径不能为空");
-        }
-        String sql = "BACKUP DATABASE SQL_BFU TO DISK = ? WITH INIT";
-        try (Connection conn = DBUtil.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, backupPath.trim());
-            ps.executeUpdate();
-        }
-    }
-
-    /**
-     * 执行增量（差异）备份。
-     */
-    public void executeDiffBackup(String backupPath) throws Exception {
-        if (backupPath == null || backupPath.trim().isEmpty()) {
-            throw new IllegalArgumentException("备份文件路径不能为空");
-        }
-        String sql = "BACKUP DATABASE SQL_BFU TO DISK = ? WITH DIFFERENTIAL, INIT";
-        try (Connection conn = DBUtil.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, backupPath.trim());
-            ps.executeUpdate();
-        }
-    }
-
-    /**
-     * 对备份文件做恢复校验（不真正恢复数据库）。
-     */
-    public void executeRestoreVerify(String backupPath) throws Exception {
-        if (backupPath == null || backupPath.trim().isEmpty()) {
-            throw new IllegalArgumentException("备份文件路径不能为空");
-        }
-        String sql = "RESTORE VERIFYONLY FROM DISK = ?";
-        try (Connection conn = DBUtil.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, backupPath.trim());
-            ps.execute();
-        }
-    }
-
     public List<AdminAuditLog> listAuditLogs() throws Exception {
         String sql = "SELECT Log_ID, Action_Type, Action_Detail, Operator_ID, Action_Time " +
-                "FROM Sys_Admin_Audit_Log ORDER BY Action_Time DESC";
+                     "FROM Sys_Admin_Audit_Log ORDER BY Action_Time DESC";
         List<AdminAuditLog> logs = new ArrayList<>();
         try (Connection conn = DBUtil.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
@@ -407,7 +335,7 @@ public class AdminDao {
 
     public void insertAuditLog(AdminAuditLog log) throws Exception {
         String sql = "INSERT INTO Sys_Admin_Audit_Log (Action_Type, Action_Detail, Operator_ID, Action_Time) " +
-                "VALUES (?, ?, ?, ?)";
+                     "VALUES (?, ?, ?, ?)";
         try (Connection conn = DBUtil.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, log.getActionType());
@@ -456,53 +384,6 @@ public class AdminDao {
             }
         }
         return Math.max(1, (System.nanoTime() - start) / 1_000_000);
-    }
-
-    /**
-     * 简单估算接口可用率：当前应用能够正常访问数据库则认为 99.90%，否则为 0。
-     * 在课程设计场景下用于给管理台提供一个“真实来源”的监控指标。
-     */
-    public double loadApiAvailability() {
-        try (Connection conn = DBUtil.getConnection();
-             PreparedStatement ps = conn.prepareStatement("SELECT 1");
-             ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) {
-                return 99.90d;
-            }
-        } catch (Exception e) {
-            return 0.0d;
-        }
-        return 0.0d;
-    }
-
-    /**
-     * 查询当前数据库占用的空间，并按一个预设总容量（1 TB）估算磁盘占用率。
-     * 实际项目中可以改为接入运维监控系统或读取真实磁盘容量。
-     */
-    public Map<String, Double> queryDiskUsage() throws Exception {
-        double usedMb = 0.0d;
-        String sql = "SELECT SUM(size) * 8.0 / 1024.0 AS DbSizeMB FROM sys.database_files";
-        try (Connection conn = DBUtil.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) {
-                usedMb = rs.getDouble("DbSizeMB");
-            }
-        }
-        if (usedMb < 0) {
-            usedMb = 0.0d;
-        }
-        // 这里假设总容量为 1 TB（1024 * 1024 MB），仅用于展示
-        double totalMb = 1024.0d * 1024.0d;
-        double usedGb = usedMb / 1024.0d;
-        double totalGb = totalMb / 1024.0d;
-        double percent = totalMb > 0 ? Math.min(100.0d, (usedMb / totalMb) * 100.0d) : 0.0d;
-
-        Map<String, Double> result = new LinkedHashMap<>();
-        result.put("usedGb", usedGb);
-        result.put("totalGb", totalGb);
-        result.put("percent", percent);
-        return result;
     }
 
     private int queryCount(String sql) throws Exception {

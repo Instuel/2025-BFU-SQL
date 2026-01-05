@@ -25,16 +25,14 @@ public class AnalystDao {
 
     public Map<String, Object> getForecastOverview(int windowDays) throws Exception {
         Map<String, Object> overview = new HashMap<>();
-        // 直接计算偏差率，不依赖计算列，查询所有有实际值的记录
-        String deviationSql = "SELECT " +
-                              "AVG(CASE WHEN Actual_Val IS NOT NULL AND Forecast_Val IS NOT NULL AND Forecast_Val <> 0 " +
-                              "    THEN ABS((Actual_Val - Forecast_Val) / Forecast_Val * 100) ELSE NULL END) AS avgDeviationRate, " +
-                              "COUNT(CASE WHEN Actual_Val IS NOT NULL THEN 1 END) AS sampleCount, " +
-                              "MAX(Forecast_Date) AS latestDate " +
+        String deviationSql = "SELECT AVG(ABS((Forecast_Val - Actual_Val) / NULLIF(Actual_Val, 0))) * 100 AS avgDeviationRate, " +
+                              "COUNT(*) AS sampleCount, MAX(Forecast_Date) AS latestDate " +
                               "FROM Data_PV_Forecast " +
-                              "WHERE Actual_Val IS NOT NULL";
+                              "WHERE Actual_Val IS NOT NULL " +
+                              "AND Forecast_Date >= DATEADD(DAY, -?, CAST(GETDATE() AS DATE))";
         try (Connection conn = DBUtil.getConnection();
              PreparedStatement ps = conn.prepareStatement(deviationSql)) {
+            ps.setInt(1, windowDays);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     overview.putAll(mapRow(rs));
@@ -93,39 +91,24 @@ public class AnalystDao {
         String sql = "WITH ranked AS ( " +
                      "  SELECT f.Point_ID AS pointId, p.Point_Name AS pointName, " +
                      "         f.Forecast_Val AS forecastVal, f.Actual_Val AS actualVal, " +
-                     "         f.Deviation_Rate AS deviationRate, " +
+                     "         CASE WHEN f.Actual_Val IS NULL OR f.Actual_Val = 0 THEN NULL " +
+                     "              ELSE (f.Forecast_Val - f.Actual_Val) / f.Actual_Val * 100 END AS deviationRate, " +
                      "         f.Forecast_Date AS forecastDate, " +
+                     "         w.Cloud_Cover AS cloudCover, w.Temperature AS temperature, w.Irradiance AS irradiance, " +
+                     "         CASE WHEN w.Weather_ID IS NULL THEN N'未接入天气数据' " +
+                     "              ELSE CONCAT(N'云量', w.Cloud_Cover, N'%, 温度', w.Temperature, N'℃, 辐照', w.Irradiance, N'W/㎡') END AS weatherFactor, " +
+                     "         CASE WHEN w.Weather_ID IS NULL THEN N'补充天气因子采集' " +
+                     "              WHEN w.Cloud_Cover >= 70 THEN N'引入云量实时修正' " +
+                     "              WHEN w.Irradiance < 400 THEN N'辐照度校准' " +
+                     "              WHEN w.Temperature >= 35 THEN N'加入温度灵敏度' " +
+                     "              ELSE N'持续观察' END AS optimizationAdvice, " +
                      "         ROW_NUMBER() OVER (PARTITION BY f.Point_ID ORDER BY f.Forecast_Date DESC, f.Time_Slot DESC) AS rn " +
                      "  FROM Data_PV_Forecast f " +
                      "  JOIN PV_Grid_Point p ON f.Point_ID = p.Point_ID " +
+                     "  LEFT JOIN PV_Weather_Daily w ON f.Point_ID = w.Point_ID AND f.Forecast_Date = w.Weather_Date " +
                      "  WHERE f.Actual_Val IS NOT NULL " +
-                     "), " +
-                     "avg_deviation AS ( " +
-                     "  SELECT Point_ID, AVG(ABS(Deviation_Rate)) AS avgDeviation " +
-                     "  FROM Data_PV_Forecast " +
-                     "  WHERE Deviation_Rate IS NOT NULL " +
-                     "  GROUP BY Point_ID " +
                      ") " +
-                     "SELECT TOP (?) r.pointId, r.pointName, r.forecastVal, r.actualVal, " +
-                     "       r.deviationRate, a.avgDeviation AS avgDeviationRate, " +
-                     "       CASE " +
-                     "         WHEN ABS(r.deviationRate) > 20 THEN N'云量变化/辐照波动' " +
-                     "         WHEN ABS(r.deviationRate) > 15 THEN N'温度异常/设备效率' " +
-                     "         WHEN ABS(r.deviationRate) > 10 THEN N'季节性偏差' " +
-                     "         WHEN ABS(r.deviationRate) > 5 THEN N'随机波动' " +
-                     "         ELSE N'正常范围' " +
-                     "       END AS weatherFactor, " +
-                     "       CASE " +
-                     "         WHEN ABS(r.deviationRate) > 20 THEN N'引入实时天气修正' " +
-                     "         WHEN ABS(r.deviationRate) > 15 THEN N'优化模型参数' " +
-                     "         WHEN ABS(r.deviationRate) > 10 THEN N'增加历史样本' " +
-                     "         WHEN ABS(r.deviationRate) > 5 THEN N'持续监测' " +
-                     "         ELSE N'保持现状' " +
-                     "       END AS optimizationAdvice " +
-                     "FROM ranked r " +
-                     "LEFT JOIN avg_deviation a ON r.pointId = a.Point_ID " +
-                     "WHERE r.rn = 1 " +
-                     "ORDER BY ABS(r.deviationRate) DESC";
+                     "SELECT TOP (?) * FROM ranked WHERE rn = 1 ORDER BY ABS(deviationRate) DESC";
         List<Map<String, Object>> items = new ArrayList<>();
         try (Connection conn = DBUtil.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {

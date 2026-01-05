@@ -14,6 +14,7 @@ public class DeviceLedger {
     private Integer warrantyYears;
     private LocalDateTime calibrationTime;
     private String calibrationPerson;
+    private Long factoryId;
 
     private LocalDate warrantyExpireDate;
     private Integer warrantyDaysLeft;
@@ -89,6 +90,14 @@ public class DeviceLedger {
 
     public void setCalibrationPerson(String calibrationPerson) {
         this.calibrationPerson = calibrationPerson;
+    }
+
+    public Long getFactoryId() {
+        return factoryId;
+    }
+
+    public void setFactoryId(Long factoryId) {
+        this.factoryId = factoryId;
     }
 
     public LocalDate getWarrantyExpireDate() {

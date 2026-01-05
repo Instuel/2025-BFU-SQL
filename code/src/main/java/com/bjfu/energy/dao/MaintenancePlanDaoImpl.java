@@ -43,8 +43,8 @@ public class MaintenancePlanDaoImpl implements MaintenancePlanDao {
         sql.append("SELECT p.Plan_ID, p.Ledger_ID, p.Plan_Type, p.Plan_Content, p.Plan_Date, ")
            .append("p.Owner_Name, p.Status, p.Created_At, ")
            .append("l.Device_Name, l.Device_Type ")
-           .append("FROM Maintenance_Plan p ")
-           .append("LEFT JOIN Device_Ledger l ON p.Ledger_ID = l.Ledger_ID ")
+           .append("FROM dbo.Maintenance_Plan p ")
+           .append("LEFT JOIN dbo.Device_Ledger l ON p.Ledger_ID = l.Ledger_ID ")
            .append("WHERE 1=1 ");
         List<Object> params = new ArrayList<>();
         if (deviceType != null && !deviceType.trim().isEmpty()) {
@@ -77,8 +77,8 @@ public class MaintenancePlanDaoImpl implements MaintenancePlanDao {
         String sql = "SELECT p.Plan_ID, p.Ledger_ID, p.Plan_Type, p.Plan_Content, p.Plan_Date, " +
                      "p.Owner_Name, p.Status, p.Created_At, " +
                      "l.Device_Name, l.Device_Type " +
-                     "FROM Maintenance_Plan p " +
-                     "LEFT JOIN Device_Ledger l ON p.Ledger_ID = l.Ledger_ID " +
+                     "FROM dbo.Maintenance_Plan p " +
+                     "LEFT JOIN dbo.Device_Ledger l ON p.Ledger_ID = l.Ledger_ID " +
                      "WHERE p.Ledger_ID = ? " +
                      "ORDER BY p.Plan_Date ASC, p.Plan_ID DESC";
         List<MaintenancePlan> list = new ArrayList<>();
@@ -96,7 +96,7 @@ public class MaintenancePlanDaoImpl implements MaintenancePlanDao {
 
     @Override
     public Long insert(MaintenancePlan plan) throws Exception {
-        String sql = "INSERT INTO Maintenance_Plan (Ledger_ID, Plan_Type, Plan_Content, Plan_Date, " +
+        String sql = "INSERT INTO dbo.Maintenance_Plan (Ledger_ID, Plan_Type, Plan_Content, Plan_Date, " +
                      "Owner_Name, Status, Created_At) VALUES (?,?,?,?,?,?,?)";
         try (Connection conn = DBUtil.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {

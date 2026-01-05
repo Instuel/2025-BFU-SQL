@@ -37,6 +37,15 @@ public class AlarmService {
         return alarms;
     }
 
+    public List<AlarmInfo> listAlarmsByFactory(Long factoryId, String alarmType, String alarmLevel, String processStatus, String verifyStatus) throws Exception {
+        List<AlarmInfo> alarms = alarmInfoDao.findByFactory(factoryId, alarmType, alarmLevel, processStatus, verifyStatus);
+        LocalDateTime now = LocalDateTime.now();
+        for (AlarmInfo alarm : alarms) {
+            applyDispatchOverdue(alarm, now);
+        }
+        return alarms;
+    }
+
     public AlarmInfo getAlarm(Long alarmId) throws Exception {
         AlarmInfo alarm = alarmInfoDao.findById(alarmId);
         if (alarm != null) {
@@ -89,6 +98,106 @@ public class AlarmService {
         return orders;
     }
 
+    public List<WorkOrder> listWorkOrdersByOandmId(Long oandmId, String reviewStatus) throws Exception {
+        List<WorkOrder> orders = workOrderDao.findByOandmId(oandmId, reviewStatus);
+        LocalDateTime now = LocalDateTime.now();
+        for (WorkOrder order : orders) {
+            applyResponseOverdue(order, now);
+        }
+        return orders;
+    }
+
+    // 运维人员专用方法：根据运维人员ID查询工单
+    public List<WorkOrder> listWorkOrdersByOM(String omId, String status, String reviewStatus) throws Exception {
+        if (omId == null || omId.trim().isEmpty()) {
+            throw new IllegalArgumentException("运维人员ID不能为空");
+        }
+        Long oandmId = Long.valueOf(omId.trim());
+        return listWorkOrdersByOandmId(oandmId, reviewStatus);
+    }
+
+    // 运维人员专用方法：查询特定告警的工单（仅限分配给该运维人员的）
+    public WorkOrder findWorkOrderByAlarmIdAndOM(String alarmId, String omId) throws Exception {
+        if (alarmId == null || alarmId.trim().isEmpty()) {
+            return null;
+        }
+        if (omId == null || omId.trim().isEmpty()) {
+            return null;
+        }
+        
+        WorkOrder workOrder = workOrderDao.findByAlarmId(Long.valueOf(alarmId.trim()));
+        if (workOrder != null && workOrder.getOandmId() != null) {
+            // 只返回分配给当前运维人员的工单
+            if (workOrder.getOandmId().equals(Long.valueOf(omId.trim()))) {
+                applyResponseOverdue(workOrder, LocalDateTime.now());
+                return workOrder;
+            }
+        }
+        return null;
+    }
+
+    // 运维人员专用方法：根据工单ID查询（仅限分配给该运维人员的）
+    public WorkOrder findWorkOrderById(String orderId) throws Exception {
+        if (orderId == null || orderId.trim().isEmpty()) {
+            return null;
+        }
+        WorkOrder order = workOrderDao.findById(Long.valueOf(orderId.trim()));
+        if (order != null) {
+            applyResponseOverdue(order, LocalDateTime.now());
+        }
+        return order;
+    }
+
+    // 运维人员专用方法：更新工单信息
+    public boolean updateWorkOrder(String orderId, String responseTime, String completionTime, 
+                                 String attachmentPath, String processResult) throws Exception {
+        if (orderId == null || orderId.trim().isEmpty()) {
+            return false;
+        }
+        
+        WorkOrder order = workOrderDao.findById(Long.valueOf(orderId.trim()));
+        if (order == null) {
+            return false;
+        }
+        
+        // 更新响应时间
+        if (responseTime != null && !responseTime.trim().isEmpty()) {
+            order.setResponseTime(java.time.LocalDateTime.parse(responseTime.trim()));
+        }
+        
+        // 更新完成时间
+        if (completionTime != null && !completionTime.trim().isEmpty()) {
+            order.setFinishTime(java.time.LocalDateTime.parse(completionTime.trim()));
+        }
+        
+        // 更新附件路径
+        if (attachmentPath != null && !attachmentPath.trim().isEmpty()) {
+            order.setAttachmentPath(attachmentPath.trim());
+        }
+        
+        // 更新处理结果
+        if (processResult != null && !processResult.trim().isEmpty()) {
+            order.setResultDesc(processResult.trim());
+        }
+        
+        workOrderDao.update(order);
+        return true;
+    }
+
+    // 运维人员专用方法：提交工单
+    public boolean submitWorkOrder(String orderId, String responseTime, String completionTime, 
+                                 String attachmentPath, String processResult) throws Exception {
+        boolean updated = updateWorkOrder(orderId, responseTime, completionTime, attachmentPath, processResult);
+        if (updated) {
+            WorkOrder order = workOrderDao.findById(Long.valueOf(orderId.trim()));
+            if (order != null) {
+                order.setReviewStatus(null);
+                workOrderDao.update(order);
+            }
+        }
+        return updated;
+    }
+
     public List<WorkOrder> listWorkOrdersForLedger(Long ledgerId) throws Exception {
         List<WorkOrder> orders = workOrderDao.findByLedgerId(ledgerId);
         LocalDateTime now = LocalDateTime.now();
@@ -102,9 +211,27 @@ public class AlarmService {
         if (order == null || order.getAlarmId() == null) {
             throw new IllegalArgumentException("告警编号不能为空");
         }
-        if (workOrderDao.findByAlarmId(order.getAlarmId()) != null) {
-            throw new IllegalStateException("该告警已存在运维工单");
+        
+        // 检查是否已存在工单
+        WorkOrder existingOrder = workOrderDao.findByAlarmId(order.getAlarmId());
+        if (existingOrder != null) {
+            // 如果已存在工单，更新现有工单而不是创建新工单
+            existingOrder.setOandmId(order.getOandmId());
+            existingOrder.setDispatcherId(order.getDispatcherId());
+            existingOrder.setLedgerId(order.getLedgerId());
+            existingOrder.setDispatchTime(order.getDispatchTime() != null ? order.getDispatchTime() : LocalDateTime.now());
+            existingOrder.setResultDesc(order.getResultDesc());
+            existingOrder.setAttachmentPath(order.getAttachmentPath());
+            // 重置工单状态，重新开始流程
+            existingOrder.setResponseTime(null);
+            existingOrder.setFinishTime(null);
+            existingOrder.setReviewStatus(null);
+            
+            workOrderDao.update(existingOrder);
+            alarmInfoDao.updateStatus(order.getAlarmId(), "处理中");
+            return existingOrder.getOrderId();
         }
+        
         AlarmInfo alarm = alarmInfoDao.findById(order.getAlarmId());
         if (alarm == null) {
             throw new IllegalArgumentException("告警不存在");
@@ -177,6 +304,15 @@ public class AlarmService {
 
     public List<DeviceLedger> listLedgers(String deviceType, String scrapStatus) throws Exception {
         List<DeviceLedger> ledgers = deviceLedgerDao.findAll(deviceType, scrapStatus);
+        LocalDate today = LocalDate.now();
+        for (DeviceLedger ledger : ledgers) {
+            applyWarrantyStatus(ledger, today);
+        }
+        return ledgers;
+    }
+
+    public List<DeviceLedger> listLedgersByFactory(Long factoryId, String deviceType, String scrapStatus) throws Exception {
+        List<DeviceLedger> ledgers = deviceLedgerDao.findByFactory(factoryId, deviceType, scrapStatus);
         LocalDate today = LocalDate.now();
         for (DeviceLedger ledger : ledgers) {
             applyWarrantyStatus(ledger, today);

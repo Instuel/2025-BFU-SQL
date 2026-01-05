@@ -113,6 +113,9 @@
           <td>${o.reviewStatus}</td>
           <td>
             <a class="btn btn-link" href="${ctx}/alarm?action=workorderDetail&id=${o.orderId}&module=alarm">查看</a>
+            <c:if test="${currentRoleType != 'OM'}">
+              <a class="btn btn-link" href="${ctx}/alarm?action=detail&id=${o.alarmId}&module=alarm">告警</a>
+            </c:if>
           </td>
         </tr>
       </c:forEach>
