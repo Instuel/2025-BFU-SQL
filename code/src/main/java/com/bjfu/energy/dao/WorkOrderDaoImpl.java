@@ -20,8 +20,6 @@ public class WorkOrderDaoImpl implements WorkOrderDao {
         order.setAlarmId(rs.getLong("Alarm_ID"));
         long oandmId = rs.getLong("OandM_ID");
         order.setOandmId(rs.wasNull() ? null : oandmId);
-        long dispatcherId = rs.getLong("Dispatcher_ID");
-        order.setDispatcherId(rs.wasNull() ? null : dispatcherId);
         long ledgerId = rs.getLong("Ledger_ID");
         order.setLedgerId(rs.wasNull() ? null : ledgerId);
         Timestamp dispatch = rs.getTimestamp("Dispatch_Time");
@@ -38,7 +36,6 @@ public class WorkOrderDaoImpl implements WorkOrderDao {
         }
         order.setResultDesc(rs.getString("Result_Desc"));
         order.setReviewStatus(rs.getString("Review_Status"));
-        order.setReviewFeedback(rs.getString("Review_Feedback"));
         order.setAttachmentPath(rs.getString("Attachment_Path"));
 
         order.setAlarmLevel(rs.getString("Alarm_Level"));
@@ -53,8 +50,8 @@ public class WorkOrderDaoImpl implements WorkOrderDao {
     @Override
     public List<WorkOrder> findAll(String reviewStatus) throws Exception {
         StringBuilder sql = new StringBuilder();
-        sql.append("SELECT w.Order_ID, w.Alarm_ID, w.OandM_ID, w.Dispatcher_ID, w.Ledger_ID, w.Dispatch_Time, w.Response_Time, ")
-           .append("w.Finish_Time, w.Result_Desc, w.Review_Status, w.Review_Feedback, w.Attachment_Path, ")
+        sql.append("SELECT w.Order_ID, w.Alarm_ID, w.OandM_ID, w.Ledger_ID, w.Dispatch_Time, w.Response_Time, ")
+           .append("w.Finish_Time, w.Result_Desc, w.Review_Status, w.Attachment_Path, ")
            .append("a.Alarm_Level, a.Alarm_Type, a.Content, a.Process_Status, ")
            .append("l.Device_Name, l.Device_Type ")
            .append("FROM Work_Order w ")
@@ -63,13 +60,8 @@ public class WorkOrderDaoImpl implements WorkOrderDao {
            .append("WHERE 1=1 ");
         List<Object> params = new ArrayList<>();
         if (reviewStatus != null && !reviewStatus.trim().isEmpty()) {
-            String status = reviewStatus.trim();
-            if ("待审核".equals(status)) {
-                sql.append("AND (w.Review_Status IS NULL) ");
-            } else {
-                sql.append("AND w.Review_Status = ? ");
-                params.add(status);
-            }
+            sql.append("AND w.Review_Status = ? ");
+            params.add(reviewStatus.trim());
         }
         sql.append("ORDER BY w.Dispatch_Time DESC, w.Order_ID DESC");
 
@@ -90,8 +82,8 @@ public class WorkOrderDaoImpl implements WorkOrderDao {
 
     @Override
     public WorkOrder findById(Long orderId) throws Exception {
-        String sql = "SELECT TOP 1 w.Order_ID, w.Alarm_ID, w.OandM_ID, w.Dispatcher_ID, w.Ledger_ID, w.Dispatch_Time, " +
-                     "w.Response_Time, w.Finish_Time, w.Result_Desc, w.Review_Status, w.Review_Feedback, w.Attachment_Path, " +
+        String sql = "SELECT TOP 1 w.Order_ID, w.Alarm_ID, w.OandM_ID, w.Ledger_ID, w.Dispatch_Time, " +
+                     "w.Response_Time, w.Finish_Time, w.Result_Desc, w.Review_Status, w.Attachment_Path, " +
                      "a.Alarm_Level, a.Alarm_Type, a.Content, a.Process_Status, " +
                      "l.Device_Name, l.Device_Type " +
                      "FROM Work_Order w " +
@@ -112,8 +104,8 @@ public class WorkOrderDaoImpl implements WorkOrderDao {
 
     @Override
     public WorkOrder findByAlarmId(Long alarmId) throws Exception {
-        String sql = "SELECT TOP 1 w.Order_ID, w.Alarm_ID, w.OandM_ID, w.Dispatcher_ID, w.Ledger_ID, w.Dispatch_Time, " +
-                     "w.Response_Time, w.Finish_Time, w.Result_Desc, w.Review_Status, w.Review_Feedback, w.Attachment_Path, " +
+        String sql = "SELECT TOP 1 w.Order_ID, w.Alarm_ID, w.OandM_ID, w.Ledger_ID, w.Dispatch_Time, " +
+                     "w.Response_Time, w.Finish_Time, w.Result_Desc, w.Review_Status, w.Attachment_Path, " +
                      "a.Alarm_Level, a.Alarm_Type, a.Content, a.Process_Status, " +
                      "l.Device_Name, l.Device_Type " +
                      "FROM Work_Order w " +
@@ -134,8 +126,8 @@ public class WorkOrderDaoImpl implements WorkOrderDao {
 
     @Override
     public List<WorkOrder> findByLedgerId(Long ledgerId) throws Exception {
-        String sql = "SELECT w.Order_ID, w.Alarm_ID, w.OandM_ID, w.Dispatcher_ID, w.Ledger_ID, w.Dispatch_Time, " +
-                     "w.Response_Time, w.Finish_Time, w.Result_Desc, w.Review_Status, w.Review_Feedback, w.Attachment_Path, " +
+        String sql = "SELECT w.Order_ID, w.Alarm_ID, w.OandM_ID, w.Ledger_ID, w.Dispatch_Time, " +
+                     "w.Response_Time, w.Finish_Time, w.Result_Desc, w.Review_Status, w.Attachment_Path, " +
                      "a.Alarm_Level, a.Alarm_Type, a.Content, a.Process_Status, " +
                      "l.Device_Name, l.Device_Type " +
                      "FROM Work_Order w " +
@@ -157,48 +149,9 @@ public class WorkOrderDaoImpl implements WorkOrderDao {
     }
 
     @Override
-    public List<WorkOrder> findByOandmId(Long oandmId, String reviewStatus) throws Exception {
-        StringBuilder sql = new StringBuilder();
-        sql.append("SELECT w.Order_ID, w.Alarm_ID, w.OandM_ID, w.Dispatcher_ID, w.Ledger_ID, w.Dispatch_Time, ")
-           .append("w.Response_Time, w.Finish_Time, w.Result_Desc, w.Review_Status, w.Review_Feedback, w.Attachment_Path, ")
-           .append("a.Alarm_Level, a.Alarm_Type, a.Content, a.Process_Status, ")
-           .append("l.Device_Name, l.Device_Type ")
-           .append("FROM Work_Order w ")
-           .append("LEFT JOIN Alarm_Info a ON w.Alarm_ID = a.Alarm_ID ")
-           .append("LEFT JOIN Device_Ledger l ON w.Ledger_ID = l.Ledger_ID ")
-           .append("WHERE w.OandM_ID = ? ");
-        List<Object> params = new ArrayList<>();
-        params.add(oandmId);
-        if (reviewStatus != null && !reviewStatus.trim().isEmpty()) {
-            String status = reviewStatus.trim();
-            if ("待审核".equals(status)) {
-                sql.append("AND (w.Review_Status IS NULL) ");
-            } else {
-                sql.append("AND w.Review_Status = ? ");
-                params.add(status);
-            }
-        }
-        sql.append("ORDER BY w.Dispatch_Time DESC, w.Order_ID DESC");
-
-        List<WorkOrder> list = new ArrayList<>();
-        try (Connection conn = DBUtil.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
-            for (int i = 0; i < params.size(); i++) {
-                ps.setObject(i + 1, params.get(i));
-            }
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    list.add(mapRow(rs));
-                }
-            }
-        }
-        return list;
-    }
-
-    @Override
     public Long insert(WorkOrder order) throws Exception {
-        String sql = "INSERT INTO Work_Order (Alarm_ID, OandM_ID, Dispatcher_ID, Ledger_ID, Dispatch_Time, Response_Time, " +
-                     "Finish_Time, Result_Desc, Review_Status, Review_Feedback, Attachment_Path) VALUES (?,?,?,?,?,?,?,?,?,?,?)";
+        String sql = "INSERT INTO Work_Order (Alarm_ID, OandM_ID, Ledger_ID, Dispatch_Time, Response_Time, " +
+                     "Finish_Time, Result_Desc, Review_Status, Attachment_Path) VALUES (?,?,?,?,?,?,?,?,?)";
         try (Connection conn = DBUtil.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setLong(1, order.getAlarmId());
@@ -207,35 +160,29 @@ public class WorkOrderDaoImpl implements WorkOrderDao {
             } else {
                 ps.setLong(2, order.getOandmId());
             }
-            if (order.getDispatcherId() == null) {
+            if (order.getLedgerId() == null) {
                 ps.setNull(3, Types.BIGINT);
             } else {
-                ps.setLong(3, order.getDispatcherId());
-            }
-            if (order.getLedgerId() == null) {
-                ps.setNull(4, Types.BIGINT);
-            } else {
-                ps.setLong(4, order.getLedgerId());
+                ps.setLong(3, order.getLedgerId());
             }
             if (order.getDispatchTime() == null) {
-                ps.setNull(5, Types.TIMESTAMP);
+                ps.setNull(4, Types.TIMESTAMP);
             } else {
-                ps.setTimestamp(5, Timestamp.valueOf(order.getDispatchTime()));
+                ps.setTimestamp(4, Timestamp.valueOf(order.getDispatchTime()));
             }
             if (order.getResponseTime() == null) {
-                ps.setNull(6, Types.TIMESTAMP);
+                ps.setNull(5, Types.TIMESTAMP);
             } else {
-                ps.setTimestamp(6, Timestamp.valueOf(order.getResponseTime()));
+                ps.setTimestamp(5, Timestamp.valueOf(order.getResponseTime()));
             }
             if (order.getFinishTime() == null) {
-                ps.setNull(7, Types.TIMESTAMP);
+                ps.setNull(6, Types.TIMESTAMP);
             } else {
-                ps.setTimestamp(7, Timestamp.valueOf(order.getFinishTime()));
+                ps.setTimestamp(6, Timestamp.valueOf(order.getFinishTime()));
             }
-            ps.setString(8, order.getResultDesc());
-            ps.setString(9, order.getReviewStatus());
-            ps.setString(10, order.getReviewFeedback());
-            ps.setString(11, order.getAttachmentPath());
+            ps.setString(7, order.getResultDesc());
+            ps.setString(8, order.getReviewStatus());
+            ps.setString(9, order.getAttachmentPath());
 
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -252,7 +199,7 @@ public class WorkOrderDaoImpl implements WorkOrderDao {
     @Override
     public void update(WorkOrder order) throws Exception {
         String sql = "UPDATE Work_Order SET OandM_ID = ?, Ledger_ID = ?, Dispatch_Time = ?, Response_Time = ?, " +
-                     "Finish_Time = ?, Result_Desc = ?, Review_Status = ?, Review_Feedback = ?, Attachment_Path = ? WHERE Order_ID = ?";
+                     "Finish_Time = ?, Result_Desc = ?, Review_Status = ?, Attachment_Path = ? WHERE Order_ID = ?";
         try (Connection conn = DBUtil.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             if (order.getOandmId() == null) {
@@ -282,9 +229,8 @@ public class WorkOrderDaoImpl implements WorkOrderDao {
             }
             ps.setString(6, order.getResultDesc());
             ps.setString(7, order.getReviewStatus());
-            ps.setString(8, order.getReviewFeedback());
-            ps.setString(9, order.getAttachmentPath());
-            ps.setLong(10, order.getOrderId());
+            ps.setString(8, order.getAttachmentPath());
+            ps.setLong(9, order.getOrderId());
             ps.executeUpdate();
         }
     }

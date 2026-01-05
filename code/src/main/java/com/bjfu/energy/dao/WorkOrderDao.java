@@ -9,7 +9,6 @@ public interface WorkOrderDao {
     WorkOrder findById(Long orderId) throws Exception;
     WorkOrder findByAlarmId(Long alarmId) throws Exception;
     List<WorkOrder> findByLedgerId(Long ledgerId) throws Exception;
-    List<WorkOrder> findByOandmId(Long oandmId, String reviewStatus) throws Exception;
     Long insert(WorkOrder order) throws Exception;
     void update(WorkOrder order) throws Exception;
 }

@@ -15,18 +15,23 @@
         <div style="font-weight:600;font-size:16px;">变压器运行清单</div>
         <div style="color:#94a3b8;font-size:12px;margin-top:4px;">运行状态为异常时需联动告警</div>
       </div>
-      <form action="${pageContext.request.contextPath}/dist" method="get" style="display:flex;gap:12px;flex-wrap:wrap;">
-        <input type="hidden" name="module" value="dist"/>
-        <input type="hidden" name="action" value="transformer_list"/>
-        <label>设备运行状态
-          <select name="transformerStatus" style="margin-left:6px;padding:8px 10px;border-radius:8px;border:1px solid #e2e8f0;">
-            <option value="">全部</option>
-            <option value="正常" <c:if test="${transformerStatus == '正常'}">selected</c:if>>正常</option>
-            <option value="异常" <c:if test="${transformerStatus == '异常'}">selected</c:if>>异常</option>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <label>所属配电房
+          <select style="margin-left:6px;padding:8px 10px;border-radius:8px;border:1px solid #e2e8f0;">
+            <option>全部</option>
+            <option>DR-001 总配电房</option>
+            <option>DR-002 分配电房 1</option>
           </select>
         </label>
-        <button class="btn btn-primary" type="submit">筛选</button>
-      </form>
+        <label>运行状态
+          <select style="margin-left:6px;padding:8px 10px;border-radius:8px;border:1px solid #e2e8f0;">
+            <option>全部</option>
+            <option>正常</option>
+            <option>异常</option>
+          </select>
+        </label>
+        <button class="btn btn-primary">筛选</button>
+      </div>
     </div>
 
     <table class="table" style="margin-top:16px;width:100%;">
@@ -62,24 +67,6 @@
       </c:if>
       </tbody>
     </table>
-    
-    <c:if test="${transformerTotalCount > 0}">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;">
-        <div style="color:#64748b;font-size:14px;">
-          共 ${transformerTotalCount} 条记录，第 ${transformerPage} / <c:out value="${(transformerTotalCount + transformerPageSize - 1) / transformerPageSize}" default="1"/> 页
-        </div>
-        <div style="display:flex;gap:8px;">
-          <c:if test="${transformerPage > 1}">
-            <a class="btn btn-secondary" href="${pageContext.request.contextPath}/dist?module=dist&action=transformer_list&transformerStatus=${transformerStatus}&page=1">首页</a>
-            <a class="btn btn-secondary" href="${pageContext.request.contextPath}/dist?module=dist&action=transformer_list&transformerStatus=${transformerStatus}&page=${transformerPage - 1}">上一页</a>
-          </c:if>
-          <c:if test="${transformerPage < (transformerTotalCount + transformerPageSize - 1) / transformerPageSize}">
-            <a class="btn btn-secondary" href="${pageContext.request.contextPath}/dist?module=dist&action=transformer_list&transformerStatus=${transformerStatus}&page=${transformerPage + 1}">下一页</a>
-            <a class="btn btn-secondary" href="${pageContext.request.contextPath}/dist?module=dist&action=transformer_list&transformerStatus=${transformerStatus}&page=${(transformerTotalCount + transformerPageSize - 1) / transformerPageSize}">末页</a>
-          </c:if>
-        </div>
-      </div>
-    </c:if>
   </div>
 </div>
 

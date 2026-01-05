@@ -90,15 +90,37 @@ public class AdminService {
         if (endTime == null || endTime.trim().isEmpty()) {
             throw new IllegalArgumentException("结束时间不能为空");
         }
+
+        // 统一映射为数据库允许的四种类型：低谷、平段、高峰、尖峰
+        String rawType = timeType.trim();
+        String normalizedType;
+        switch (rawType) {
+            case "谷":
+                normalizedType = "低谷";
+                break;
+            case "平":
+                normalizedType = "平段";
+                break;
+            case "峰":
+                normalizedType = "高峰";
+                break;
+            case "尖":
+                normalizedType = "尖峰";
+                break;
+            default:
+                normalizedType = rawType;
+                break;
+        }
+
         PeakValleyConfig config = new PeakValleyConfig();
-        config.setTimeType(timeType.trim());
+        config.setTimeType(normalizedType);
         config.setStartTime(LocalTime.parse(startTime));
         config.setEndTime(LocalTime.parse(endTime));
         if (priceRate != null && !priceRate.trim().isEmpty()) {
             config.setPriceRate(new BigDecimal(priceRate.trim()));
         }
         adminDao.savePeakValleyConfig(config);
-        writeAuditLog("峰谷时段配置", "新增 " + timeType + " " + startTime + "-" + endTime, operatorId);
+        writeAuditLog("峰谷时段配置", "新增 " + normalizedType + " " + startTime + "-" + endTime, operatorId);
     }
 
     public List<BackupLog> listBackupLogs() throws Exception {
@@ -113,16 +135,47 @@ public class AdminService {
         if (backupType == null || backupType.trim().isEmpty()) {
             throw new IllegalArgumentException("备份类型不能为空");
         }
+
         BackupLog log = new BackupLog();
         log.setBackupType(backupType.trim());
         log.setBackupPath(backupPath == null ? null : backupPath.trim());
-        log.setStatus(status == null || status.trim().isEmpty() ? "成功" : status.trim());
         log.setOperatorId(operatorId);
         log.setStartTime(LocalDateTime.now());
-        log.setEndTime(LocalDateTime.now());
-        log.setRemark(remark == null ? null : remark.trim());
-        adminDao.insertBackupLog(log);
-        writeAuditLog("备份/恢复", "执行 " + backupType + " 任务", operatorId);
+
+        boolean success = false;
+        String finalStatus = (status == null || status.trim().isEmpty()) ? null : status.trim();
+        String finalRemark = remark == null ? null : remark.trim();
+
+        try {
+            // 真正执行备份/恢复动作
+            if ("全量备份".equals(backupType)) {
+                adminDao.executeFullBackup(log.getBackupPath());
+            } else if ("增量备份".equals(backupType)) {
+                adminDao.executeDiffBackup(log.getBackupPath());
+            } else if ("恢复演练".equals(backupType)) {
+                adminDao.executeRestoreVerify(log.getBackupPath());
+            }
+            success = true;
+        } catch (Exception e) {
+            // 失败时在备注中追加错误信息
+            StringBuilder sb = new StringBuilder();
+            if (finalRemark != null && !finalRemark.isEmpty()) {
+                sb.append(finalRemark).append("；");
+            }
+            sb.append("执行失败: ").append(e.getMessage());
+            finalRemark = sb.toString();
+            finalStatus = "失败";
+            throw e;
+        } finally {
+            log.setEndTime(LocalDateTime.now());
+            if (finalStatus == null || finalStatus.isEmpty()) {
+                finalStatus = success ? "成功" : "失败";
+            }
+            log.setStatus(finalStatus);
+            log.setRemark(finalRemark);
+            adminDao.insertBackupLog(log);
+            writeAuditLog("备份/恢复", "执行 " + backupType + " 任务", operatorId);
+        }
     }
 
     public List<AdminAuditLog> listAuditLogs() throws Exception {

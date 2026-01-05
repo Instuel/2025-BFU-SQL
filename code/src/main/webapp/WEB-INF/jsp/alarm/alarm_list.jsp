@@ -166,7 +166,7 @@
           </td>
           <td>
             <a class="btn btn-link" href="${ctx}/alarm?action=detail&id=${a.alarmId}&module=alarm">查看</a>
-            <c:if test="${a.workOrderId != null && currentRoleType != 'OM'}">
+            <c:if test="${a.workOrderId != null}">
               <a class="btn btn-link" href="${ctx}/alarm?action=workorderDetail&id=${a.workOrderId}&module=alarm">工单</a>
             </c:if>
           </td>

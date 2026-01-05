@@ -183,7 +183,7 @@ public class EnergyDao {
            .append("SUM(CASE WHEN p.Peak_Type = '低谷' THEN p.Total_Consumption ELSE 0 END) AS valleyConsumption, ")
            .append("SUM(p.Total_Consumption) AS totalConsumption, ")
            .append("SUM(p.Cost_Amount) AS totalCost ")
-           .append("FROM Data_PeakValley p ")
+           .append("FROM View_PeakValley_Dynamic p ")
            .append("JOIN Base_Factory f ON p.Factory_ID = f.Factory_ID ")
            .append("WHERE 1=1 ");
         List<Object> params = new ArrayList<>();
@@ -213,7 +213,7 @@ public class EnergyDao {
     }
 
     public Map<String, Object> getLatestPeakValleyReportStats() throws Exception {
-        String dateSql = "SELECT TOP 1 Stat_Date AS statDate FROM Data_PeakValley ORDER BY Stat_Date DESC";
+        String dateSql = "SELECT TOP 1 Stat_Date AS statDate FROM View_PeakValley_Dynamic ORDER BY Stat_Date DESC";
         try (Connection conn = DBUtil.getConnection();
              PreparedStatement ps = conn.prepareStatement(dateSql);
              ResultSet rs = ps.executeQuery()) {
@@ -225,7 +225,8 @@ public class EnergyDao {
                          "SUM(CASE WHEN Peak_Type = '低谷' THEN Total_Consumption ELSE 0 END) AS valleyConsumption, " +
                          "SUM(Total_Consumption) AS totalConsumption, " +
                          "SUM(Cost_Amount) AS totalCost " +
-                         "FROM Data_PeakValley WHERE Stat_Date = ?";
+                         "FROM View_PeakValley_Dynamic " +
+                         "WHERE Stat_Date = ?";
             try (PreparedStatement detailPs = conn.prepareStatement(sql)) {
                 detailPs.setObject(1, statDate);
                 detailPs.setObject(2, statDate);

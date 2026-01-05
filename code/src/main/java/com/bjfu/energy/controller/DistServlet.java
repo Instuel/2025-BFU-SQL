@@ -1,10 +1,6 @@
 package com.bjfu.energy.controller;
 
 import com.bjfu.energy.dao.DistMonitorDao;
-import com.bjfu.energy.entity.SysUser;
-import com.bjfu.energy.entity.RoleOandM;
-import com.bjfu.energy.dao.RoleOandMDao;
-import com.bjfu.energy.dao.RoleOandMDaoImpl;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -13,7 +9,6 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.ArrayList;
 
 /**
  * 配电网监测路由控制器：
@@ -33,63 +28,36 @@ public class DistServlet extends HttpServlet {
             action = "room_list";
         }
 
-        String jsp = "/WEB-INF/jsp/dist/room_list.jsp";
-        Long userFactoryId = null;
-        
+        String jsp;
         try {
-            SysUser currentUser = (SysUser) req.getSession().getAttribute("currentUser");
-            String roleType = (String) req.getSession().getAttribute("currentRoleType");
-            
-            if ("OM".equals(roleType) && currentUser != null) {
-                RoleOandMDao roleOandMDao = new RoleOandMDaoImpl();
-                RoleOandM oandm = roleOandMDao.findByUserId(currentUser.getUserId());
-                if (oandm != null) {
-                    userFactoryId = oandm.getFactoryId();
-                }
-            }
-            
             switch (action) {
                 case "room_list":
-                    String roomSort = req.getParameter("roomSort");
-                    int roomPage = parseInt(req.getParameter("page"), 1);
-                    int roomPageSize = parseInt(req.getParameter("pageSize"), 20);
-                    req.setAttribute("roomStats", distDao.getRoomStats(userFactoryId));
-                    req.setAttribute("rooms", distDao.listRooms(userFactoryId, roomSort, roomPage, roomPageSize));
-                    req.setAttribute("roomSort", roomSort);
-                    req.setAttribute("roomPage", roomPage);
-                    req.setAttribute("roomPageSize", roomPageSize);
-                    req.setAttribute("roomTotalCount", distDao.countRooms(userFactoryId));
+                    req.setAttribute("roomStats", distDao.getRoomStats());
+                    req.setAttribute("rooms", distDao.listRooms());
                     jsp = "/WEB-INF/jsp/dist/room_list.jsp";
                     break;
                 case "room_detail":
                     Long roomId = parseLong(req.getParameter("id"));
                     if (roomId == null) {
-                        List<Map<String, Object>> rooms = distDao.listRooms(userFactoryId);
+                        List<Map<String, Object>> rooms = distDao.listRooms();
                         if (!rooms.isEmpty()) {
                             roomId = ((Number) rooms.get(0).get("roomId")).longValue();
                         }
                     }
                     Map<String, Object> room = roomId == null ? null : distDao.findRoomById(roomId);
                     req.setAttribute("room", room);
-                    req.setAttribute("circuits", roomId == null ? java.util.Collections.emptyList() : distDao.listCircuits(roomId, userFactoryId));
-                    req.setAttribute("transformers", roomId == null ? java.util.Collections.emptyList() : distDao.listTransformers(roomId, userFactoryId));
+                    req.setAttribute("circuits", roomId == null ? java.util.Collections.emptyList() : distDao.listCircuits(roomId));
+                    req.setAttribute("transformers", roomId == null ? java.util.Collections.emptyList() : distDao.listTransformers(roomId));
                     jsp = "/WEB-INF/jsp/dist/room_detail.jsp";
                     break;
                 case "circuit_list":
-                    String circuitStatus = req.getParameter("circuitStatus");
-                    int circuitPage = parseInt(req.getParameter("page"), 1);
-                    int circuitPageSize = parseInt(req.getParameter("pageSize"), 20);
-                    req.setAttribute("circuits", distDao.listCircuits(null, userFactoryId, circuitStatus, circuitPage, circuitPageSize));
-                    req.setAttribute("circuitStatus", circuitStatus);
-                    req.setAttribute("circuitPage", circuitPage);
-                    req.setAttribute("circuitPageSize", circuitPageSize);
-                    req.setAttribute("circuitTotalCount", distDao.countCircuits(null, userFactoryId, circuitStatus));
+                    req.setAttribute("circuits", distDao.listCircuits(null));
                     jsp = "/WEB-INF/jsp/dist/circuit_list.jsp";
                     break;
                 case "circuit_detail":
                     Long circuitId = parseLong(req.getParameter("id"));
                     if (circuitId == null) {
-                        List<Map<String, Object>> circuits = distDao.listCircuits(null, userFactoryId);
+                        List<Map<String, Object>> circuits = distDao.listCircuits(null);
                         if (!circuits.isEmpty()) {
                             circuitId = ((Number) circuits.get(0).get("circuitId")).longValue();
                         }
@@ -106,20 +74,13 @@ public class DistServlet extends HttpServlet {
                     jsp = "/WEB-INF/jsp/dist/circuit_detail.jsp";
                     break;
                 case "transformer_list":
-                    String transformerStatus = req.getParameter("transformerStatus");
-                    int transformerPage = parseInt(req.getParameter("page"), 1);
-                    int transformerPageSize = parseInt(req.getParameter("pageSize"), 20);
-                    req.setAttribute("transformers", distDao.listTransformers(null, userFactoryId, transformerStatus, transformerPage, transformerPageSize));
-                    req.setAttribute("transformerStatus", transformerStatus);
-                    req.setAttribute("transformerPage", transformerPage);
-                    req.setAttribute("transformerPageSize", transformerPageSize);
-                    req.setAttribute("transformerTotalCount", distDao.countTransformers(null, userFactoryId, transformerStatus));
+                    req.setAttribute("transformers", distDao.listTransformers(null));
                     jsp = "/WEB-INF/jsp/dist/transformer_list.jsp";
                     break;
                 case "transformer_detail":
                     Long transformerId = parseLong(req.getParameter("id"));
                     if (transformerId == null) {
-                        List<Map<String, Object>> transformers = distDao.listTransformers(null, userFactoryId);
+                        List<Map<String, Object>> transformers = distDao.listTransformers(null);
                         if (!transformers.isEmpty()) {
                             transformerId = ((Number) transformers.get(0).get("transformerId")).longValue();
                         }
@@ -137,21 +98,21 @@ public class DistServlet extends HttpServlet {
                     break;
                 case "data_circuit_list":
                     Long filterCircuitId = parseLong(req.getParameter("circuitId"));
-                    req.setAttribute("circuitOptions", distDao.listCircuitOptions(userFactoryId));
+                    req.setAttribute("circuitOptions", distDao.listCircuitOptions());
                     req.setAttribute("selectedCircuitId", filterCircuitId);
                     req.setAttribute("circuitData", distDao.listCircuitData(filterCircuitId));
                     jsp = "/WEB-INF/jsp/dist/data_circuit_list.jsp";
                     break;
                 case "data_transformer_list":
                     Long filterTransformerId = parseLong(req.getParameter("transformerId"));
-                    req.setAttribute("transformerOptions", distDao.listTransformerOptions(userFactoryId));
+                    req.setAttribute("transformerOptions", distDao.listTransformerOptions());
                     req.setAttribute("selectedTransformerId", filterTransformerId);
                     req.setAttribute("transformerData", distDao.listTransformerData(filterTransformerId));
                     jsp = "/WEB-INF/jsp/dist/data_transformer_list.jsp";
                     break;
                 default:
-                    req.setAttribute("roomStats", distDao.getRoomStats(userFactoryId));
-                    req.setAttribute("rooms", distDao.listRooms(userFactoryId));
+                    req.setAttribute("roomStats", distDao.getRoomStats());
+                    req.setAttribute("rooms", distDao.listRooms());
                     jsp = "/WEB-INF/jsp/dist/room_list.jsp";
                     break;
             }
@@ -176,17 +137,6 @@ public class DistServlet extends HttpServlet {
             return Long.parseLong(value.trim());
         } catch (NumberFormatException ex) {
             return null;
-        }
-    }
-
-    private int parseInt(String value, int defaultValue) {
-        if (value == null || value.trim().isEmpty()) {
-            return defaultValue;
-        }
-        try {
-            return Integer.parseInt(value.trim());
-        } catch (NumberFormatException ex) {
-            return defaultValue;
         }
     }
 }

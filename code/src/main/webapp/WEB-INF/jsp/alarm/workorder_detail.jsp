@@ -1,12 +1,5 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
-<%
-    String currentRoleType = (String) session.getAttribute("roleType");
-    boolean isOM = "OM".equals(currentRoleType);
-    boolean isDispatcher = "DISPATCHER".equals(currentRoleType);
-    request.setAttribute("isOM", isOM);
-    request.setAttribute("isDispatcher", isDispatcher);
-%>
 <%@ include file="/WEB-INF/jsp/common/header.jsp" %>
 <%@ include file="/WEB-INF/jsp/common/sidebar.jsp" %>
 
@@ -109,15 +102,15 @@
           </div>
           <div class="form-group">
             <label>运维人员 ID</label>
-            <input name="oandmId" value="${workOrder.oandmId}" <c:if test="${isOM}">readonly</c:if>/>
+            <input name="oandmId" value="${workOrder.oandmId}"/>
           </div>
           <div class="form-group">
             <label>设备台账编号</label>
-            <input name="ledgerId" value="${workOrder.ledgerId}" <c:if test="${isOM}">readonly</c:if>/>
+            <input name="ledgerId" value="${workOrder.ledgerId}"/>
           </div>
           <div class="form-group">
             <label>派单时间</label>
-            <input type="datetime-local" name="dispatchTime" value="${workOrder.dispatchTime}" <c:if test="${isOM}">readonly</c:if>/>
+            <input type="datetime-local" name="dispatchTime" value="${workOrder.dispatchTime}"/>
           </div>
           <div class="form-group">
             <label>响应时间</label>
@@ -140,7 +133,7 @@
           </div>
           <div class="form-group">
             <label>复查状态</label>
-            <select name="reviewStatus" disabled>
+            <select name="reviewStatus">
               <option value="" <c:if test="${empty workOrder.reviewStatus}">selected</c:if>>未复查</option>
               <option value="通过" <c:if test="${workOrder.reviewStatus == '通过'}">selected</c:if>>通过</option>
               <option value="未通过" <c:if test="${workOrder.reviewStatus == '未通过'}">selected</c:if>>未通过</option>
@@ -164,23 +157,13 @@
             <label>处理结果</label>
             <textarea name="resultDesc" rows="4">${workOrder.resultDesc}</textarea>
           </div>
-          <div class="form-group" style="display:flex;align-items:flex-end;gap:12px;">
+          <div class="form-group" style="display:flex;align-items:flex-end;">
             <button class="btn btn-primary" type="submit">保存工单</button>
-            <button class="btn btn-success" type="button" onclick="submitWorkOrder()">提交工单</button>
           </div>
         </form>
       </div>
 
-      <script>
-        function submitWorkOrder() {
-          var form = document.querySelector('form');
-          var actionInput = form.querySelector('input[name="action"]');
-          actionInput.value = "submitWorkOrder";
-          form.submit();
-        }
-      </script>
-
-      <c:if test="${workOrder.reviewStatus == '未通过' && isDispatcher}">
+      <c:if test="${workOrder.reviewStatus == '未通过'}">
         <div class="rule-form" style="margin-top:24px;">
           <div class="rule-form-header">
             <h2>复查未通过 - 重新派单</h2>
@@ -204,19 +187,6 @@
               <button class="btn btn-primary" type="submit">确认重新派单</button>
             </div>
           </form>
-        </div>
-      </c:if>
-      
-      <!-- 运维人员看到的复查未通过信息（只读） -->
-      <c:if test="${workOrder.reviewStatus == '未通过' && isOM}">
-        <div class="rule-form" style="margin-top:24px;">
-          <div class="rule-form-header">
-            <h2>复查未通过</h2>
-          </div>
-          <div class="warning-message">
-            <strong>复查未通过：</strong>${workOrder.reviewFeedback}
-            <br><small>请根据反馈意见重新处理工单，完成后重新提交。工单重新派发由管理员负责。</small>
-          </div>
         </div>
       </c:if>
     </c:if>
