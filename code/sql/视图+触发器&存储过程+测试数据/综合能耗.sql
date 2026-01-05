@@ -349,10 +349,7 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    /* 1) 选择一个“必定满足 CK_Alarm_Type”的 Alarm_Type
-          - 优先取 Alarm_Info 里已有的一个类型（一定能过约束）
-          - 如果 Alarm_Info 为空，则退回用 '越限告警'（你之前脚本中已使用过）
-    */
+    /* 1) 选择一个“必定满足 CK_Alarm_Type”的 Alarm_Type */
     DECLARE @AlarmType NVARCHAR(50);
     SELECT TOP 1 @AlarmType = Alarm_Type
     FROM dbo.Alarm_Info
@@ -361,7 +358,9 @@ BEGIN
 
     SET @AlarmType = ISNULL(@AlarmType, N'越限告警');
 
-    /* 2) 计算每条 inserted 对应的上一条数据、波动率 */
+    /* 2) 计算 inserted 的上一条数据和波动率，并落到临时表 #F（供后续多条语句复用） */
+    IF OBJECT_ID('tempdb..#F') IS NOT NULL DROP TABLE #F;
+
     ;WITH I AS (
         SELECT
             i.Data_ID,
@@ -387,69 +386,74 @@ BEGIN
               AND de.Collect_Time < I.Collect_Time
             ORDER BY de.Collect_Time DESC, de.Data_ID DESC
         ) Prev
-    ),
-    F AS (
-        SELECT
-            P.*,
-            CASE
-                WHEN P.Fluctuation_Rate > 30 THEN N'差'
-                WHEN P.Fluctuation_Rate > 20 THEN N'中'
-                ELSE NULL
-            END AS New_Quality,
-            CASE
-                WHEN P.Fluctuation_Rate > 30 THEN 30
-                WHEN P.Fluctuation_Rate > 20 THEN 20
-                ELSE NULL
-            END AS ThresholdUsed
-        FROM P
-        WHERE P.Fluctuation_Rate IS NOT NULL
-          AND P.Fluctuation_Rate > 20
     )
-    /* 3) 更新 Data_Energy.Quality（只在需要时更新，避免无意义写入） */
-    UPDATE de
-    SET de.Quality = F.New_Quality
-    FROM dbo.Data_Energy de
-    JOIN F ON F.Data_ID = de.Data_ID
-    WHERE de.Quality <> F.New_Quality;
+    SELECT
+        P.Data_ID,
+        P.Meter_ID,
+        P.Factory_ID,
+        P.Collect_Time,
+        P.Current_Value,
+        P.Previous_Value,
+        P.Fluctuation_Rate,
+        CASE
+            WHEN P.Fluctuation_Rate > 30 THEN N'差'
+            WHEN P.Fluctuation_Rate > 20 THEN N'中'
+            ELSE NULL
+        END AS New_Quality,
+        CASE
+            WHEN P.Fluctuation_Rate > 30 THEN 30
+            WHEN P.Fluctuation_Rate > 20 THEN 20
+            ELSE NULL
+        END AS ThresholdUsed
+    INTO #F
+    FROM P
+    WHERE P.Fluctuation_Rate IS NOT NULL
+      AND P.Fluctuation_Rate > 20;
 
-    /* 4) 写入 Alarm_Info 告警（避免同一条 Data_ID 重复插入）
-          - 需要 Alarm_Info 表至少包含这些列：
-            Alarm_Type, Alarm_Level, Content, Occur_Time, Process_Status,
-            Ledger_ID, Factory_ID, Trigger_Threshold, Verify_Status, Verify_Remark
-          - Ledger_ID：从 Energy_Meter.Ledger_ID 取（你视图里就是这么设计的）
-    */
+    /* 如果本次没有任何波动超阈值的数据，直接退出 */
+    IF NOT EXISTS (SELECT 1 FROM #F) RETURN;
+
+    /* 3) 更新 Data_Energy.Quality（NULL-safe，避免漏更新） */
+    UPDATE de
+    SET de.Quality = f.New_Quality
+    FROM dbo.Data_Energy de
+    INNER JOIN #F f ON f.Data_ID = de.Data_ID
+    WHERE ISNULL(de.Quality, N'') <> ISNULL(f.New_Quality, N'');
+
+    /* 4) 写入 Alarm_Info 告警（避免重复） */
     INSERT INTO dbo.Alarm_Info (
         Alarm_Type, Alarm_Level, Content, Occur_Time, Process_Status,
         Ledger_ID, Factory_ID, Trigger_Threshold, Verify_Status, Verify_Remark
     )
     SELECT
         @AlarmType AS Alarm_Type,
-        CASE WHEN F.New_Quality = N'差' THEN N'高' ELSE N'中' END AS Alarm_Level,
-        N'能耗数据波动异常：设备(Meter_ID=' + CAST(F.Meter_ID AS NVARCHAR(20)) + N') '
-        + N'本次=' + CAST(F.Current_Value AS NVARCHAR(30))
-        + N'，上次=' + CAST(F.Previous_Value AS NVARCHAR(30))
-        + N'，波动率=' + CAST(CAST(F.Fluctuation_Rate AS DECIMAL(10,2)) AS NVARCHAR(30)) + N'%'
-        + N'（阈值>' + CAST(F.ThresholdUsed AS NVARCHAR(10)) + N'%），已标记数据质量为“' + F.New_Quality + N'”。'
+        CASE WHEN f.New_Quality = N'差' THEN N'高' ELSE N'中' END AS Alarm_Level,
+        N'能耗数据波动异常：设备(Meter_ID=' + CAST(f.Meter_ID AS NVARCHAR(20)) + N') '
+        + N'本次=' + CAST(f.Current_Value AS NVARCHAR(30))
+        + N'，上次=' + CAST(f.Previous_Value AS NVARCHAR(30))
+        + N'，波动率=' + CAST(CAST(f.Fluctuation_Rate AS DECIMAL(10,2)) AS NVARCHAR(30)) + N'%'
+        + N'（阈值>' + CAST(f.ThresholdUsed AS NVARCHAR(10)) + N'%），已标记数据质量为“' + f.New_Quality + N'”。'
         AS Content,
-        F.Collect_Time AS Occur_Time,
+        f.Collect_Time AS Occur_Time,
         N'未处理' AS Process_Status,
         m.Ledger_ID,
-        F.Factory_ID,
-        CAST(F.ThresholdUsed AS DECIMAL(12,3)) AS Trigger_Threshold,
+        f.Factory_ID,
+        CAST(f.ThresholdUsed AS DECIMAL(12,3)) AS Trigger_Threshold,
         N'待审核' AS Verify_Status,
         NULL AS Verify_Remark
-    FROM F
-    LEFT JOIN dbo.Energy_Meter m ON m.Meter_ID = F.Meter_ID
+    FROM #F f
+    LEFT JOIN dbo.Energy_Meter m ON m.Meter_ID = f.Meter_ID
     WHERE NOT EXISTS (
         SELECT 1
         FROM dbo.Alarm_Info a
-        WHERE a.Occur_Time = F.Collect_Time
-          AND a.Factory_ID = F.Factory_ID
-          AND a.Content LIKE N'%Meter_ID=' + CAST(F.Meter_ID AS NVARCHAR(20)) + N'%'
+        WHERE a.Occur_Time = f.Collect_Time
+          AND a.Factory_ID = f.Factory_ID
+          AND a.Content LIKE N'%Meter_ID=' + CAST(f.Meter_ID AS NVARCHAR(20)) + N'%'
+          AND a.Content LIKE N'%能耗数据波动异常%'
     );
-
 END;
 GO
+
 
 PRINT '已创建触发器: TRG_Energy_Quality_Check（自动检测能耗波动并标记质量）';
 GO
