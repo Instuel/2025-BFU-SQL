@@ -106,6 +106,9 @@ public class AlarmServlet extends HttpServlet {
                 case "updateWorkOrder":
                     handleUpdateWorkOrder(req, resp);
                     break;
+                case "submitWorkOrder":
+                    handleSubmitWorkOrder(req, resp);
+                    break;
                 case "createMaintenancePlan":
                     handleCreateMaintenancePlan(req, resp);
                     break;
@@ -127,7 +130,24 @@ public class AlarmServlet extends HttpServlet {
         String alarmLevel = req.getParameter("alarmLevel");
         String processStatus = req.getParameter("processStatus");
         String verifyStatus = req.getParameter("verifyStatus");
-        List<AlarmInfo> alarms = alarmService.listAlarms(alarmType, alarmLevel, processStatus, verifyStatus);
+        
+        List<AlarmInfo> alarms;
+        String currentRoleType = (String) req.getSession().getAttribute("currentRoleType");
+        
+        if ("OM".equals(currentRoleType)) {
+            Long userFactoryId = null;
+            com.bjfu.energy.entity.SysUser currentUser = (com.bjfu.energy.entity.SysUser) req.getSession().getAttribute("currentUser");
+            if (currentUser != null) {
+                com.bjfu.energy.dao.RoleOandMDao roleOandMDao = new com.bjfu.energy.dao.RoleOandMDaoImpl();
+                com.bjfu.energy.entity.RoleOandM oandm = roleOandMDao.findByUserId(currentUser.getUserId());
+                if (oandm != null) {
+                    userFactoryId = oandm.getFactoryId();
+                }
+            }
+            alarms = alarmService.listAlarmsByFactory(userFactoryId, alarmType, alarmLevel, processStatus, verifyStatus);
+        } else {
+            alarms = alarmService.listAlarms(alarmType, alarmLevel, processStatus, verifyStatus);
+        }
 
         int total = alarms.size();
         int highCount = 0;
@@ -195,8 +215,25 @@ public class AlarmServlet extends HttpServlet {
     private void handleWorkOrderList(HttpServletRequest req, HttpServletResponse resp)
             throws Exception, IOException, ServletException {
         String reviewStatus = req.getParameter("reviewStatus");
+        String currentRoleType = (String) req.getSession().getAttribute("currentRoleType");
+        
         List<WorkOrder> orders = alarmService.listWorkOrders(reviewStatus);
 
+        if ("OM".equals(currentRoleType)) {
+            Long userOandmId = null;
+            com.bjfu.energy.entity.SysUser currentUser = (com.bjfu.energy.entity.SysUser) req.getSession().getAttribute("currentUser");
+            if (currentUser != null) {
+                com.bjfu.energy.dao.RoleOandMDao roleOandMDao = new com.bjfu.energy.dao.RoleOandMDaoImpl();
+                com.bjfu.energy.entity.RoleOandM oandm = roleOandMDao.findByUserId(currentUser.getUserId());
+                if (oandm != null) {
+                    userOandmId = oandm.getOandmId();
+                }
+            }
+            orders = alarmService.listWorkOrdersByOandmId(userOandmId, reviewStatus);
+        } else {
+            orders = alarmService.listWorkOrders(reviewStatus);
+        }
+       
         int total = orders.size();
         int pending = 0;
         int processing = 0;
@@ -234,8 +271,28 @@ public class AlarmServlet extends HttpServlet {
         WorkOrder order = null;
         AlarmInfo alarm = null;
         boolean createMode = false;
+        
+        String currentRoleType = (String) req.getSession().getAttribute("currentRoleType");
+        com.bjfu.energy.entity.SysUser currentUser = (com.bjfu.energy.entity.SysUser) req.getSession().getAttribute("currentUser");
+        
         if (idStr != null && !idStr.trim().isEmpty()) {
             order = alarmService.getWorkOrder(Long.valueOf(idStr));
+            
+            // 运维人员权限检查：只能查看分配给自己的工单
+            if ("OM".equals(currentRoleType) && order != null && currentUser != null) {
+                Long userOandmId = null;
+                com.bjfu.energy.dao.RoleOandMDao roleOandMDao = new com.bjfu.energy.dao.RoleOandMDaoImpl();
+                com.bjfu.energy.entity.RoleOandM oandm = roleOandMDao.findByUserId(currentUser.getUserId());
+                if (oandm != null) {
+                    userOandmId = oandm.getOandmId();
+                }
+                
+                // 如果工单不是分配给当前运维人员的，拒绝访问
+                if (order.getOandmId() == null || !order.getOandmId().equals(userOandmId)) {
+                    resp.sendError(HttpServletResponse.SC_FORBIDDEN, "您只能查看分配给自己的工单");
+                    return;
+                }
+            }
         } else if (alarmIdStr != null && !alarmIdStr.trim().isEmpty()) {
             Long alarmId = Long.valueOf(alarmIdStr);
             order = alarmService.getWorkOrderByAlarm(alarmId);
@@ -369,6 +426,26 @@ public class AlarmServlet extends HttpServlet {
         resp.sendRedirect(buildRedirect(target, "工单信息已更新"));
     }
 
+    private void handleSubmitWorkOrder(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception, IOException {
+        WorkOrder order = new WorkOrder();
+        order.setOrderId(Long.valueOf(req.getParameter("orderId")));
+        order.setAlarmId(parseLong(req.getParameter("alarmId")));
+        order.setLedgerId(parseLong(req.getParameter("ledgerId")));
+        order.setOandmId(parseLong(req.getParameter("oandmId")));
+        order.setDispatchTime(parseDateTime(req.getParameter("dispatchTime")));
+        order.setResponseTime(parseDateTime(req.getParameter("responseTime")));
+        order.setFinishTime(parseDateTime(req.getParameter("finishTime")));
+        order.setResultDesc(req.getParameter("resultDesc"));
+        order.setReviewStatus(null);
+        String attachmentPath = handleAttachmentUpload(req, null);
+        order.setAttachmentPath(attachmentPath);
+
+        alarmService.updateWorkOrder(order);
+        String target = req.getContextPath() + "/alarm?action=workorderDetail&id=" + order.getOrderId() + "&module=alarm";
+        resp.sendRedirect(buildRedirect(target, "工单已提交审核"));
+    }
+
     private void handleCreateMaintenancePlan(HttpServletRequest req, HttpServletResponse resp)
             throws Exception, IOException {
         MaintenancePlan plan = new MaintenancePlan();
@@ -427,26 +504,46 @@ public class AlarmServlet extends HttpServlet {
             throws IOException, ServletException {
         Part part = req.getPart("attachmentFile");
         if (part == null || part.getSize() == 0) {
+            return null;
+        }
+
+        long maxSize = 10 * 1024 * 1024;
+        if (part.getSize() > maxSize) {
             return fallbackPath;
         }
+
         String submittedFileName = part.getSubmittedFileName();
         if (submittedFileName == null || submittedFileName.trim().isEmpty()) {
             return fallbackPath;
         }
+
+        String fileName1 = submittedFileName.toLowerCase();
+        String[] allowedExtensions = {".png", ".jpg", ".jpeg", ".pdf", ".doc", ".docx"};
+        boolean isValidExtension = false;
+        for (String ext : allowedExtensions) {
+            if (fileName1.endsWith(ext)) {
+                isValidExtension = true;
+                break;
+            }
+        }
+        if (!isValidExtension) {
+            return null;
+        }
+
         String safeName = Paths.get(submittedFileName).getFileName().toString();
-        String fileName = "workorder_" + System.currentTimeMillis() + "_" + safeName;
+        String uniqueFileName = "workorder_" + System.currentTimeMillis() + "_" + safeName;
         String basePath = req.getServletContext().getRealPath("/uploads/workorder");
         Path uploadDir = basePath == null
                 ? Paths.get(System.getProperty("java.io.tmpdir"), "energy_uploads", "workorder")
                 : Paths.get(basePath);
         Files.createDirectories(uploadDir);
-        Path target = uploadDir.resolve(fileName);
+        Path target = uploadDir.resolve(uniqueFileName);
         try {
             Files.copy(part.getInputStream(), target);
         } catch (IOException ex) {
-            return fallbackPath;
+            return null;
         }
-        return "/uploads/workorder/" + fileName;
+        return "/uploads/workorder/" + uniqueFileName;
     }
 
     private String buildRedirect(String target, String message) {

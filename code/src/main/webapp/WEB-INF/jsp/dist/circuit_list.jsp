@@ -15,23 +15,18 @@
         <div style="font-weight:600;font-size:16px;">回路运行清单</div>
         <div style="color:#94a3b8;font-size:12px;margin-top:4px;">异常回路将高亮展示</div>
       </div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;">
-        <label>所属配电房
-          <select style="margin-left:6px;padding:8px 10px;border-radius:8px;border:1px solid #e2e8f0;">
-            <option>全部</option>
-            <option>DR-001 总配电房</option>
-            <option>DR-002 分配电房 1</option>
+      <form action="${pageContext.request.contextPath}/dist" method="get" style="display:flex;gap:12px;flex-wrap:wrap;">
+        <input type="hidden" name="module" value="dist"/>
+        <input type="hidden" name="action" value="circuit_list"/>
+        <label>设备运行状态
+          <select name="circuitStatus" style="margin-left:6px;padding:8px 10px;border-radius:8px;border:1px solid #e2e8f0;">
+            <option value="">全部</option>
+            <option value="正常" <c:if test="${circuitStatus == '正常'}">selected</c:if>>正常</option>
+            <option value="异常" <c:if test="${circuitStatus == '异常'}">selected</c:if>>异常</option>
           </select>
         </label>
-        <label>异常状态
-          <select style="margin-left:6px;padding:8px 10px;border-radius:8px;border:1px solid #e2e8f0;">
-            <option>全部</option>
-            <option>正常</option>
-            <option>异常</option>
-          </select>
-        </label>
-        <button class="btn btn-primary">筛选</button>
-      </div>
+        <button class="btn btn-primary" type="submit">筛选</button>
+      </form>
     </div>
 
     <table class="table" style="margin-top:16px;width:100%;">
@@ -73,6 +68,27 @@
       </c:if>
       </tbody>
     </table>
+<<<<<<< HEAD
+    
+    <c:if test="${circuitTotalCount > 0}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;">
+        <div style="color:#64748b;font-size:14px;">
+          共 ${circuitTotalCount} 条记录，第 ${circuitPage} / <c:out value="${(circuitTotalCount + circuitPageSize - 1) / circuitPageSize}" default="1"/> 页
+        </div>
+        <div style="display:flex;gap:8px;">
+          <c:if test="${circuitPage > 1}">
+            <a class="btn btn-secondary" href="${pageContext.request.contextPath}/dist?module=dist&action=circuit_list&circuitStatus=${circuitStatus}&page=1">首页</a>
+            <a class="btn btn-secondary" href="${pageContext.request.contextPath}/dist?module=dist&action=circuit_list&circuitStatus=${circuitStatus}&page=${circuitPage - 1}">上一页</a>
+          </c:if>
+          <c:if test="${circuitPage < (circuitTotalCount + circuitPageSize - 1) / circuitPageSize}">
+            <a class="btn btn-secondary" href="${pageContext.request.contextPath}/dist?module=dist&action=circuit_list&circuitStatus=${circuitStatus}&page=${circuitPage + 1}">下一页</a>
+            <a class="btn btn-secondary" href="${pageContext.request.contextPath}/dist?module=dist&action=circuit_list&circuitStatus=${circuitStatus}&page=${(circuitTotalCount + circuitPageSize - 1) / circuitPageSize}">末页</a>
+          </c:if>
+        </div>
+      </div>
+    </c:if>
+=======
+>>>>>>> origin/main
   </div>
 </div>
 

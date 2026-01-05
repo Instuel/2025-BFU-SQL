@@ -36,25 +36,19 @@
     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;">
       <div>
         <div style="font-weight:600;font-size:16px;">配电房列表</div>
-        <div style="color:#94a3b8;font-size:12px;margin-top:4px;">支持按电压等级、运行状态筛选</div>
+        <div style="color:#94a3b8;font-size:12px;margin-top:4px;">支持按电压等级排序</div>
       </div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;">
-        <label>电压等级
-          <select style="margin-left:6px;padding:8px 10px;border-radius:8px;border:1px solid #e2e8f0;">
-            <option>全部</option>
-            <option>35kV</option>
-            <option>0.4kV</option>
+      <form action="${pageContext.request.contextPath}/dist" method="get" style="display:flex;gap:12px;flex-wrap:wrap;">
+        <input type="hidden" name="module" value="dist"/>
+        <input type="hidden" name="action" value="room_list"/>
+        <label>排序
+          <select name="roomSort" style="margin-left:6px;padding:8px 10px;border-radius:8px;border:1px solid #e2e8f0;">
+            <option value="desc" <c:if test="${roomSort == 'desc' || empty roomSort}">selected</c:if>>电压等级降序</option>
+            <option value="asc" <c:if test="${roomSort == 'asc'}">selected</c:if>>电压等级升序</option>
           </select>
         </label>
-        <label>运行状态
-          <select style="margin-left:6px;padding:8px 10px;border-radius:8px;border:1px solid #e2e8f0;">
-            <option>全部</option>
-            <option>正常</option>
-            <option>异常</option>
-          </select>
-        </label>
-        <button class="btn btn-primary">筛选</button>
-      </div>
+        <button class="btn btn-primary" type="submit">筛选</button>
+      </form>
     </div>
 
     <table class="table" style="margin-top:16px;width:100%;">
@@ -94,6 +88,24 @@
       </c:if>
       </tbody>
     </table>
+    
+    <c:if test="${roomTotalCount > 0}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;">
+        <div style="color:#64748b;font-size:14px;">
+          共 ${roomTotalCount} 条记录，第 ${roomPage} / <c:out value="${(roomTotalCount + roomPageSize - 1) / roomPageSize}" default="1"/> 页
+        </div>
+        <div style="display:flex;gap:8px;">
+          <c:if test="${roomPage > 1}">
+            <a class="btn btn-secondary" href="${pageContext.request.contextPath}/dist?module=dist&action=room_list&roomSort=${roomSort}&page=1">首页</a>
+            <a class="btn btn-secondary" href="${pageContext.request.contextPath}/dist?module=dist&action=room_list&roomSort=${roomSort}&page=${roomPage - 1}">上一页</a>
+          </c:if>
+          <c:if test="${roomPage < (roomTotalCount + roomPageSize - 1) / roomPageSize}">
+            <a class="btn btn-secondary" href="${pageContext.request.contextPath}/dist?module=dist&action=room_list&roomSort=${roomSort}&page=${roomPage + 1}">下一页</a>
+            <a class="btn btn-secondary" href="${pageContext.request.contextPath}/dist?module=dist&action=room_list&roomSort=${roomSort}&page=${(roomTotalCount + roomPageSize - 1) / roomPageSize}">末页</a>
+          </c:if>
+        </div>
+      </div>
+    </c:if>
   </div>
 </div>
 

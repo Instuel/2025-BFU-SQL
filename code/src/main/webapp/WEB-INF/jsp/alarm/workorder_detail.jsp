@@ -82,6 +82,7 @@
     <c:if test="${workOrder == null}">
       <div class="warning-message">未找到对应工单。</div>
     </c:if>
+    
     <c:if test="${workOrder != null}">
       <div class="rule-form">
         <div class="rule-form-header">
@@ -102,6 +103,15 @@
           </div>
           <div class="form-group">
             <label>运维人员 ID</label>
+            <input name="oandmId" value="${workOrder.oandmId}" <c:if test="${isOM}">readonly</c:if>/>
+          </div>
+          <div class="form-group">
+            <label>设备台账编号</label>
+            <input name="ledgerId" value="${workOrder.ledgerId}" <c:if test="${isOM}">readonly</c:if>/>
+          </div>
+          <div class="form-group">
+            <label>派单时间</label>
+            <input type="datetime-local" name="dispatchTime" value="${workOrder.dispatchTime}" <c:if test="${isOM}">readonly</c:if>/>
             <input name="oandmId" value="${workOrder.oandmId}"/>
           </div>
           <div class="form-group">
@@ -133,6 +143,7 @@
           </div>
           <div class="form-group">
             <label>复查状态</label>
+            <select name="reviewStatus" disabled>
             <select name="reviewStatus">
               <option value="" <c:if test="${empty workOrder.reviewStatus}">selected</c:if>>未复查</option>
               <option value="通过" <c:if test="${workOrder.reviewStatus == '通过'}">selected</c:if>>通过</option>
@@ -157,12 +168,25 @@
             <label>处理结果</label>
             <textarea name="resultDesc" rows="4">${workOrder.resultDesc}</textarea>
           </div>
+          <div class="form-group" style="display:flex;align-items:flex-end;gap:12px;">
+            <button class="btn btn-primary" type="submit">保存工单</button>
+            <button class="btn btn-success" type="button" onclick="submitWorkOrder()">提交工单</button>
           <div class="form-group" style="display:flex;align-items:flex-end;">
             <button class="btn btn-primary" type="submit">保存工单</button>
           </div>
         </form>
       </div>
 
+      <script>
+        function submitWorkOrder() {
+          var form = document.querySelector('form');
+          var actionInput = form.querySelector('input[name="action"]');
+          actionInput.value = "submitWorkOrder";
+          form.submit();
+        }
+      </script>
+
+      <c:if test="${workOrder.reviewStatus == '未通过' && isDispatcher}">
       <c:if test="${workOrder.reviewStatus == '未通过'}">
         <div class="rule-form" style="margin-top:24px;">
           <div class="rule-form-header">
@@ -189,7 +213,21 @@
           </form>
         </div>
       </c:if>
+      
+      <!-- 运维人员看到的复查未通过信息（只读） -->
+      <c:if test="${workOrder.reviewStatus == '未通过' && isOM}">
+        <div class="rule-form" style="margin-top:24px;">
+          <div class="rule-form-header">
+            <h2>复查未通过</h2>
+          </div>
+          <div class="warning-message">
+            <strong>复查未通过：</strong>${workOrder.reviewFeedback}
+            <br><small>请根据反馈意见重新处理工单，完成后重新提交。工单重新派发由管理员负责。</small>
+          </div>
+        </div>
+      </c:if>
     </c:if>
+  </c:if>
   </c:if>
 </div>
 

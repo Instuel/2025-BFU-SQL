@@ -139,7 +139,6 @@
       <form class="energy-form-grid" method="post" action="${ctx}/app">
         <input type="hidden" name="module" value="energy"/>
         <input type="hidden" name="action" value="create_plan"/>
-
         <div class="energy-form-item">
           <label>厂区</label>
           <select class="energy-filter-select" name="factoryId" required>
@@ -148,7 +147,6 @@
             </c:forEach>
           </select>
         </div>
-
         <div class="energy-form-item">
           <label>能源类型</label>
           <select class="energy-filter-select" name="energyType" required>
@@ -158,10 +156,10 @@
             <option value="天然气">天然气</option>
           </select>
         </div>
-
+<<<<<<< HEAD
         <div class="energy-form-item">
           <label>方案标题</label>
-          <input class="energy-date-input" type="text" name="planTitle"
+          <input class="energy-date-input" type="text" name="planTitle" placeholder="如：峰谷用电时段调整" required/>
                  placeholder="如：峰谷用电时段调整" required/>
         </div>
 
@@ -171,10 +169,10 @@
                  placeholder="如：将高负荷生产移至 22:00 后" required/>
         </div>
 
+>>>>>>> origin/main
         <div class="energy-form-item">
           <label>启动日期</label>
           <input class="energy-date-input" type="date" name="startDate" required/>
-        </div>
 
         <div class="energy-form-item">
           <label>目标降耗 (%)</label>
@@ -192,10 +190,7 @@
     <div class="section">
       <div class="section-header">
         <h3 class="section-title">方案执行清单</h3>
-        <div class="action-buttons">
-          <button class="action-btn secondary">导出清单</button>
         </div>
-      </div>
       <div class="table-container">
         <table class="data-table">
           <thead>
@@ -241,7 +236,6 @@
         </table>
       </div>
     </div>
-
   </div>
 </div>
 

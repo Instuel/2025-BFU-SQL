@@ -109,6 +109,34 @@
     <url-pattern>/alarm/*</url-pattern>
   </servlet-mapping>
 
+  <!-- 运维工单管理员 Servlet -->
+  <servlet>
+    <servlet-name>DispatcherServlet</servlet-name>
+    <servlet-class>com.bjfu.energy.controller.DispatcherServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>DispatcherServlet</servlet-name>
+    <url-pattern>/dispatcher</url-pattern>
+  </servlet-mapping>
+  <servlet-mapping>
+    <servlet-name>DispatcherServlet</servlet-name>
+    <url-pattern>/dispatcher/*</url-pattern>
+  </servlet-mapping>
+
+  <!-- 业务视图查看 Servlet -->
+  <servlet>
+    <servlet-name>ViewServlet</servlet-name>
+    <servlet-class>com.bjfu.energy.controller.ViewServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>ViewServlet</servlet-name>
+    <url-pattern>/view</url-pattern>
+  </servlet-mapping>
+  <servlet-mapping>
+    <servlet-name>ViewServlet</servlet-name>
+    <url-pattern>/view/*</url-pattern>
+  </servlet-mapping>
+
   <welcome-file-list>
     <welcome-file>index.jsp</welcome-file>
   </welcome-file-list>

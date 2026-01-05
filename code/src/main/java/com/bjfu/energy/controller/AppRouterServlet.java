@@ -20,6 +20,7 @@ import java.util.Map;
 /**
  * 简单路由控制器：
  *  /app?module=dashboard|dist|pv|energy|alarm|admin
+ *  仅负责转发到对应的 JSP 占位页
  */
 public class AppRouterServlet extends HttpServlet {
 
@@ -38,7 +39,6 @@ public class AppRouterServlet extends HttpServlet {
         if (module == null || module.trim().isEmpty()) {
             module = "dashboard";
         }
-
         String roleType = null;
         if (req.getSession(false) != null) {
             roleType = (String) req.getSession(false).getAttribute("currentRoleType");
@@ -83,7 +83,6 @@ public class AppRouterServlet extends HttpServlet {
                                 req.setAttribute("monthlyOverview", execDashboardDao.getMonthlyOverview());
                                 req.setAttribute("screenRealtime", execDashboardDao.getRealtimeSummary());
                                 req.setAttribute("pvStats", pvDao.getPvStats());
-                                req.setAttribute("distStats", distMonitorDao.getRoomStats());
                                 req.setAttribute("highAlarms", execDashboardDao.listHighAlarms(6));
                                 req.setAttribute("screenConfigs", execDashboardDao.listDashboardConfigs());
 
@@ -393,7 +392,6 @@ public class AppRouterServlet extends HttpServlet {
                             Long listFactoryId = parseLong(req.getParameter("factoryId"));
                             String runStatus = req.getParameter("runStatus");
                             String keyword = req.getParameter("keyword");
-
                             req.setAttribute("meterStats", energyDao.getMeterStats());
                             req.setAttribute("factories", energyDao.listFactories());
                             req.setAttribute("selectedEnergyType", energyType);
@@ -489,13 +487,11 @@ public class AppRouterServlet extends HttpServlet {
             doGet(req, resp);
             return;
         }
-
         String action = req.getParameter("action");
         if (action == null || action.trim().isEmpty()) {
             doGet(req, resp);
             return;
         }
-
         try {
             switch (action) {
                 case "review_data":
@@ -585,7 +581,6 @@ public class AppRouterServlet extends HttpServlet {
             resp.sendRedirect(req.getContextPath() + "/app?module=energy&view=data_review&error=missing");
             return;
         }
-
         energyDao.upsertEnergyDataReview(dataId, reviewStatus.trim(), reviewer, reviewRemark);
         resp.sendRedirect(req.getContextPath() + "/app?module=energy&view=data_review&success=review");
     }
@@ -703,7 +698,6 @@ public class AppRouterServlet extends HttpServlet {
 
     private List<Map<String, Object>> buildModelOptimizations(int weatherCount, List<Map<String, Object>> alerts) {
         List<Map<String, Object>> items = new java.util.ArrayList<>();
-
         Map<String, Object> weather = new java.util.HashMap<>();
         weather.put("title", "天气因子融合");
         weather.put("desc", weatherCount > 0 ? "已完成特征工程" : "等待天气数据接入");
@@ -725,7 +719,6 @@ public class AppRouterServlet extends HttpServlet {
             fallback.put("status", "排队中");
             items.add(fallback);
         }
-
         return items;
     }
 }

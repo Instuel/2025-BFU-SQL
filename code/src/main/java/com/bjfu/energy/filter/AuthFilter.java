@@ -97,7 +97,7 @@ public class AuthFilter implements Filter {
         // ---------------------------
         // 说明：你的系统入口有两种：
         // 1) /app?module=xxx（工作台路由）
-        // 2) /dist、/alarm、/admin（业务线 Servlet）
+        // 2) /dist、/alarm、/admin、/dispatcher（业务线 Servlet）
         // 之前仅对 /app 做了 module 权限校验，导致访问 /dist、/alarm 直接走 uriPattern 校验，
         // 但数据库里这些模块没有配置 Uri_Pattern，于是管理员也会 403。
         String module = null;
@@ -108,13 +108,14 @@ public class AuthFilter implements Filter {
             }
         } else if (uri.startsWith(ctx + "/dist")) {
             module = "dist";
+        } else if (uri.startsWith(ctx + "/view")) {
+            module = "dist";
         } else if (uri.startsWith(ctx + "/alarm")) {
             module = "alarm";
         } else if (uri.startsWith(ctx + "/admin")) {
             module = "admin";
-        } else if (uri.startsWith(ctx + "/execDashboard")) {
-            // 企业管理层大屏 API：沿用 dashboard 模块权限
-            module = "dashboard";
+        } else if (uri.startsWith(ctx + "/dispatcher")) {
+            module = "dispatcher";
         }
 
         if (module != null) {
