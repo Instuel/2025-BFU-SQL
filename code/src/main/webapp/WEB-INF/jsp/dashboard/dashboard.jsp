@@ -521,18 +521,19 @@
               <div class="dashboard-section-hint">对比预测值与实际值差异，追踪模型优化效果。</div>
             </div>
             <div class="dashboard-chart-actions">
-              <span class="dashboard-badge">偏差阈值：±6%</span>
-              <span class="dashboard-badge">最新评估：2025-03-18</span>
+              <span class="dashboard-badge">偏差阈值：±15%</span>
+              <a class="dashboard-chart-action-btn" href="${ctx}/app?module=pv&view=forecast_list">查看详情</a>
             </div>
           </div>
           <div class="table-container">
             <table class="data-table">
               <thead>
               <tr>
-                <th>场站</th>
-                <th>预测值</th>
-                <th>实际值</th>
-                <th>偏差</th>
+                <th>并网点</th>
+                <th>最新预测值</th>
+                <th>最新实际值</th>
+                <th>最新偏差</th>
+                <th>平均偏差</th>
                 <th>影响因素</th>
                 <th>优化建议</th>
               </tr>
@@ -565,13 +566,21 @@
                       <c:otherwise>--</c:otherwise>
                     </c:choose>
                   </td>
+                  <td>
+                    <c:choose>
+                      <c:when test="${not empty insight.avgDeviationRate}">
+                        <fmt:formatNumber value="${insight.avgDeviationRate}" minFractionDigits="1" maxFractionDigits="1"/>%
+                      </c:when>
+                      <c:otherwise>--</c:otherwise>
+                    </c:choose>
+                  </td>
                   <td><c:out value="${insight.weatherFactor}" default="--"/></td>
                   <td><c:out value="${insight.optimizationAdvice}" default="--"/></td>
                 </tr>
               </c:forEach>
               <c:if test="${empty forecastInsights}">
                 <tr>
-                  <td colspan="6" style="text-align:center;color:#94a3b8;">暂无预测偏差分析数据</td>
+                  <td colspan="7" style="text-align:center;color:#94a3b8;">暂无预测偏差分析数据</td>
                 </tr>
               </c:if>
               </tbody>

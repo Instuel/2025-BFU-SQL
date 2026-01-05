@@ -12,7 +12,7 @@
       <a class="<c:out value='${pvView == \"device_list\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=device_list">设备列表</a>
       <a class="<c:out value='${pvView == \"device_detail\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=device_detail">设备详情</a>
       <a class="<c:out value='${pvView == \"gen_data_list\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=gen_data_list">发电数据</a>
-      <a class="<c:out value='${pvView == \"forecast_list\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=forecast_list">预测优化</a>
+      <a class="<c:out value='${pvView == \"forecast_list\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=forecast_list">预测信息</a>
       <a class="<c:out value='${pvView == \"forecast_detail\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=forecast_detail">预测详情</a>
       <a class="<c:out value='${pvView == \"model_alert_list\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=model_alert_list">模型告警</a>
     </div>
@@ -71,7 +71,14 @@
         <div class="pv-device-card">
           <div class="pv-device-card-header">
             <div class="pv-device-name">${device.deviceCode}（${device.deviceType}）</div>
-            <span class="pv-device-status online"><c:out value="${device.runStatus}" default="未知"/></span>
+            <c:choose>
+              <c:when test="${device.runStatus == '故障' || device.runStatus == '异常' || device.runStatus == '离线'}">
+                <span class="pv-device-status maintenance"><c:out value="${device.runStatus}" default="未知"/></span>
+              </c:when>
+              <c:otherwise>
+                <span class="pv-device-status online"><c:out value="${device.runStatus}" default="未知"/></span>
+              </c:otherwise>
+            </c:choose>
           </div>
           <div class="pv-device-metrics">
             <div class="pv-device-metric">

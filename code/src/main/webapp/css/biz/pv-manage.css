@@ -295,6 +295,23 @@
     color: #ff4d4f;
 }
 
+.pv-deviation-badge.warning {
+    background: #fffbe6;
+    color: #d48806;
+}
+
+.pv-detail-link {
+    color: var(--color-primary, #1890ff);
+    text-decoration: none;
+    font-size: var(--font-size-sm);
+    transition: color var(--transition-normal);
+}
+
+.pv-detail-link:hover {
+    color: var(--color-pv-start, #f093fb);
+    text-decoration: underline;
+}
+
 .pv-model-info {
     background: var(--bg-secondary);
     border-radius: var(--radius-md);

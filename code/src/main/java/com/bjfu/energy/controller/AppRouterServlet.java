@@ -136,6 +136,31 @@ public class AppRouterServlet extends HttpServlet {
                             List<Map<String, Object>> forecastRecords = pvDao.listForecasts(forecastPointId);
                             req.setAttribute("forecasts", forecastRecords);
                             req.setAttribute("latestForecast", forecastRecords.isEmpty() ? null : forecastRecords.get(0));
+                            // 计算统计数据
+                            int deviationOverCount = 0;
+                            double totalForecastVal = 0;
+                            double totalDeviationRate = 0;
+                            int deviationCount = 0;
+                            for (Map<String, Object> forecast : forecastRecords) {
+                                // 累计预测发电量
+                                Object forecastVal = forecast.get("forecastVal");
+                                if (forecastVal != null) {
+                                    totalForecastVal += ((Number) forecastVal).doubleValue();
+                                }
+                                // 计算偏差率统计
+                                Object rate = forecast.get("deviationRate");
+                                if (rate != null) {
+                                    double deviationRate = ((Number) rate).doubleValue();
+                                    totalDeviationRate += deviationRate;
+                                    deviationCount++;
+                                    if (Math.abs(deviationRate) > 15) {
+                                        deviationOverCount++;
+                                    }
+                                }
+                            }
+                            req.setAttribute("deviationOverCount", deviationOverCount);
+                            req.setAttribute("totalForecastVal", String.format("%.2f", totalForecastVal));
+                            req.setAttribute("avgDeviationRate", deviationCount > 0 ? String.format("%.2f", totalDeviationRate / deviationCount) : "--");
                             jsp = "/WEB-INF/jsp/pv/forecast_list.jsp";
                             break;
                         case "forecast_detail":
@@ -150,7 +175,9 @@ public class AppRouterServlet extends HttpServlet {
                             jsp = "/WEB-INF/jsp/pv/forecast_detail.jsp";
                             break;
                         case "model_alert_list":
-                            req.setAttribute("modelAlerts", pvDao.listModelAlerts());
+                            String statusFilter = req.getParameter("statusFilter");
+                            req.setAttribute("selectedStatusFilter", statusFilter);
+                            req.setAttribute("modelAlerts", pvDao.listModelAlerts(statusFilter));
                             jsp = "/WEB-INF/jsp/pv/model_alert_list.jsp";
                             break;
                         case "device_list":

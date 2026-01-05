@@ -181,8 +181,7 @@ public class PvDao {
         sql.append("SELECT f.Forecast_ID AS forecastId, p.Point_Name AS pointName, ")
            .append("f.Forecast_Date AS forecastDate, f.Time_Slot AS timeSlot, ")
            .append("f.Forecast_Val AS forecastVal, f.Actual_Val AS actualVal, ")
-           .append("CASE WHEN f.Actual_Val IS NULL OR f.Actual_Val = 0 THEN NULL ")
-           .append("ELSE (f.Forecast_Val - f.Actual_Val) / f.Actual_Val END AS deviationRate, ")
+           .append("f.Deviation_Rate AS deviationRate, ")
            .append("m.Model_Name AS modelName, f.Model_Version AS modelVersion ")
            .append("FROM Data_PV_Forecast f ")
            .append("JOIN PV_Grid_Point p ON f.Point_ID = p.Point_ID ")
@@ -213,8 +212,7 @@ public class PvDao {
         String sql = "SELECT TOP 1 f.Forecast_ID AS forecastId, p.Point_Name AS pointName, " +
                      "f.Forecast_Date AS forecastDate, f.Time_Slot AS timeSlot, " +
                      "f.Forecast_Val AS forecastVal, f.Actual_Val AS actualVal, " +
-                     "CASE WHEN f.Actual_Val IS NULL OR f.Actual_Val = 0 THEN NULL " +
-                     "ELSE (f.Forecast_Val - f.Actual_Val) / f.Actual_Val END AS deviationRate, " +
+                     "f.Deviation_Rate AS deviationRate, " +
                      "m.Model_Name AS modelName, f.Model_Version AS modelVersion " +
                      "FROM Data_PV_Forecast f " +
                      "JOIN PV_Grid_Point p ON f.Point_ID = p.Point_ID " +
@@ -233,18 +231,34 @@ public class PvDao {
     }
 
     public List<Map<String, Object>> listModelAlerts() throws Exception {
-        String sql = "SELECT a.Alert_ID AS alertId, p.Point_Name AS pointName, " +
-                     "CONVERT(VARCHAR(19), a.Trigger_Time, 120) AS triggerTime, " +
-                     "a.Remark AS remark, a.Process_Status AS processStatus, a.Model_Version AS modelVersion " +
-                     "FROM PV_Model_Alert a " +
-                     "JOIN PV_Grid_Point p ON a.Point_ID = p.Point_ID " +
-                     "ORDER BY a.Trigger_Time DESC";
+        return listModelAlerts(null);
+    }
+
+    public List<Map<String, Object>> listModelAlerts(String statusFilter) throws Exception {
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT a.Alert_ID AS alertId, p.Point_Name AS pointName, ")
+           .append("CONVERT(VARCHAR(19), a.Trigger_Time, 120) AS triggerTime, ")
+           .append("a.Remark AS remark, a.Process_Status AS processStatus, a.Model_Version AS modelVersion ")
+           .append("FROM PV_Model_Alert a ")
+           .append("JOIN PV_Grid_Point p ON a.Point_ID = p.Point_ID ");
+        
+        List<Object> params = new ArrayList<>();
+        if (statusFilter != null && !statusFilter.trim().isEmpty()) {
+            sql.append("WHERE a.Process_Status LIKE ? ");
+            params.add("%" + statusFilter.trim() + "%");
+        }
+        sql.append("ORDER BY a.Trigger_Time DESC");
+        
         List<Map<String, Object>> items = new ArrayList<>();
         try (Connection conn = DBUtil.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                items.add(mapRow(rs));
+             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    items.add(mapRow(rs));
+                }
             }
         }
         return items;
