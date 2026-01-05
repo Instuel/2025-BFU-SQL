@@ -1,6 +1,7 @@
 package com.bjfu.energy.controller;
 
 import com.bjfu.energy.dao.AnalystDao;
+import com.bjfu.energy.dao.DistMonitorDao;
 import com.bjfu.energy.dao.EnergyDao;
 import com.bjfu.energy.dao.ExecDashboardDao;
 import com.bjfu.energy.dao.AdminDao;
@@ -26,6 +27,7 @@ public class AppRouterServlet extends HttpServlet {
     private final EnergyDao energyDao = new EnergyDao();
     private final PvDao pvDao = new PvDao();
     private final ExecDashboardDao execDashboardDao = new ExecDashboardDao();
+    private final DistMonitorDao distMonitorDao = new DistMonitorDao();
     private final AnalystDao analystDao = new AnalystDao();
     private final AdminDao adminDao = new AdminDao();
 
@@ -46,6 +48,71 @@ public class AppRouterServlet extends HttpServlet {
         switch (module) {
             case "dashboard":
                 roleType = getRoleType(req);
+                // 企业管理层（EXEC）专属工作台 / 大屏 / 科研项目
+                // 说明：AuthServlet 登录后会跳到 /app?module=dashboard&view=execDesk
+                // 这里需要根据 view 做进一步分发。
+                if ("EXEC".equals(roleType)) {
+                    String view = req.getParameter("view");
+                    if (view == null || view.trim().isEmpty()) {
+                        view = "execDesk";
+                    }
+                    try {
+                        switch (view) {
+                            case "execDesk":
+                                // 仅展示入口卡片，无需加载重数据
+                                jsp = "/WEB-INF/jsp/exec/exec_desk.jsp";
+                                break;
+                            case "execScreen": {
+                                // 大屏：实时汇总 + 月度概览 + 光伏/配电统计 + 高等级告警 + 历史趋势
+                                req.setAttribute("monthlyOverview", execDashboardDao.getMonthlyOverview());
+                                req.setAttribute("screenRealtime", execDashboardDao.getRealtimeSummary());
+                                req.setAttribute("pvStats", pvDao.getPvStats());
+                                req.setAttribute("distStats", distMonitorDao.getRoomStats());
+                                req.setAttribute("highAlarms", execDashboardDao.listHighAlarms(6));
+
+                                String trendEnergyType = req.getParameter("trendEnergyType");
+                                String trendCycle = req.getParameter("trendCycle");
+                                if (trendEnergyType == null || trendEnergyType.trim().isEmpty()) {
+                                    trendEnergyType = "电";
+                                }
+                                if (trendCycle == null || trendCycle.trim().isEmpty()) {
+                                    trendCycle = "月";
+                                }
+                                req.setAttribute("trendEnergyType", trendEnergyType);
+                                req.setAttribute("trendCycle", trendCycle);
+                                req.setAttribute("screenTrends", execDashboardDao.listHistoryTrends(trendEnergyType, trendCycle, 12));
+
+                                applyFlashMessage(req);
+                                jsp = "/WEB-INF/jsp/exec/exec_screen.jsp";
+                                break;
+                            }
+                            case "execProject": {
+                                // 科研项目：申报/结题 + 列表
+                                req.setAttribute("openProjects", execDashboardDao.listOpenProjects());
+                                req.setAttribute("recentProjects", execDashboardDao.listResearchProjects());
+                                applyFlashMessage(req);
+                                jsp = "/WEB-INF/jsp/exec/exec_project.jsp";
+                                break;
+                            }
+                            case "execHighAlarm": {
+                                // 高等级告警推送：从大屏进入，仅列表展示
+                                req.setAttribute("highAlarms", execDashboardDao.listHighAlarms(100));
+                                applyFlashMessage(req);
+                                jsp = "/WEB-INF/jsp/exec/exec_high_alarm.jsp";
+                                break;
+                            }
+                            default:
+                                jsp = "/WEB-INF/jsp/exec/exec_desk.jsp";
+                                break;
+                        }
+                    } catch (Exception e) {
+                        throw new ServletException("企业管理层工作台数据加载失败: " + e.getMessage(), e);
+                    }
+
+                    // 直接 forward，避免继续走 dashboard.jsp 的加载逻辑
+                    req.getRequestDispatcher(jsp).forward(req, resp);
+                    return;
+                }
                 if ("ADMIN".equals(roleType)) {
                     try {
                         req.setAttribute("systemCounters", adminDao.loadSystemCounters());
@@ -60,31 +127,6 @@ public class AppRouterServlet extends HttpServlet {
                         }
                     } catch (Exception e) {
                         throw new ServletException("系统管理员工作台数据加载失败: " + e.getMessage(), e);
-                    }
-                }
-                if ("EXEC".equals(roleType)) {
-                    try {
-                        req.setAttribute("execOverview", execDashboardDao.getMonthlyOverview());
-                        req.setAttribute("execRealtime", execDashboardDao.getRealtimeSummary());
-                        req.setAttribute("execHighAlarms", execDashboardDao.listHighAlarms(6));
-                        req.setAttribute("execDecisionItems", execDashboardDao.listDecisionItems());
-                        req.setAttribute("execMonthlySummaries", execDashboardDao.listEnergySummaries("month"));
-                        req.setAttribute("execQuarterlySummaries", execDashboardDao.listEnergySummaries("quarter"));
-                        req.setAttribute("execProjects", execDashboardDao.listResearchProjects());
-                        req.setAttribute("execOpenProjects", execDashboardDao.listOpenProjects());
-
-                        // 历史趋势（可通过页面下拉框切换）
-                        String trendEnergyType = req.getParameter("trendEnergyType");
-                        String trendCycle = req.getParameter("trendCycle");
-                        req.setAttribute("execTrendEnergyType", trendEnergyType == null ? "电" : trendEnergyType);
-                        req.setAttribute("execTrendCycle", trendCycle == null ? "月" : trendCycle);
-                        req.setAttribute("execTrends", execDashboardDao.listHistoryTrends(trendEnergyType, trendCycle, 12));
-
-                        // 能耗溯源 Top 厂区（默认本月电）
-                        req.setAttribute("execTopFactories", execDashboardDao.listTopFactories("电", "month", 5));
-                        applyFlashMessage(req);
-                    } catch (Exception e) {
-                        throw new ServletException("管理层大屏数据加载失败: " + e.getMessage(), e);
                     }
                 }
                 if ("ENERGY".equals(roleType)) {
@@ -318,7 +360,12 @@ public class AppRouterServlet extends HttpServlet {
                         setFlashMessage(req, "warning", "请选择项目并填写结题报告");
                     }
                 }
-                resp.sendRedirect(req.getContextPath() + "/app?module=dashboard");
+                // 允许页面指定提交后返回的 view；默认回到管理层工作台
+                String returnView = req.getParameter("returnView");
+                if (returnView == null || returnView.trim().isEmpty()) {
+                    returnView = "execDesk";
+                }
+                resp.sendRedirect(req.getContextPath() + "/app?module=dashboard&view=" + returnView);
                 return;
             } catch (Exception e) {
                 throw new ServletException("管理层操作处理失败: " + e.getMessage(), e);

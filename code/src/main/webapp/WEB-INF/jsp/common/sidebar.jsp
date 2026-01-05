@@ -13,18 +13,18 @@
   </div>
 
   <ul class="sidebar-menu">
-    <!-- 企业管理层（EXEC）：侧边栏只展示 4 个入口 -->
+    <!-- 企业管理层（EXEC）：侧边栏只展示 4 个入口（高等级告警入口改为从大屏进入） -->
     <c:if test="${roleType == 'EXEC'}">
+      <li>
+        <a class="<c:out value='${m=="dashboard" && v=="execDesk" ? "active" : ""}'/>"
+           href="${ctx}/app?module=dashboard&view=execDesk">
+          <span class="icon">🏠</span> <span>工作台</span>
+        </a>
+      </li>
       <li>
         <a class="<c:out value='${m==\"dashboard\" && v==\"execScreen\" ? \"active\" : \"\"}'/>"
            href="${ctx}/app?module=dashboard&view=execScreen">
           <span class="icon">📺</span> <span>大屏</span>
-        </a>
-      </li>
-      <li>
-        <a class="<c:out value='${m==\"alarm\" ? \"active\" : \"\"}'/>"
-           href="${ctx}/alarm?action=list&module=alarm&alarmLevel=高">
-          <span class="icon">🔔</span> <span>高等级告警推送</span>
         </a>
       </li>
       <li>
