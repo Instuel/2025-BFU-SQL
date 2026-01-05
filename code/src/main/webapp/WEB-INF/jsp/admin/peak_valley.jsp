@@ -22,13 +22,13 @@
         <div class="form-group">
           <label class="form-label">时段类型</label>
           <select class="input" name="timeType">
-            <option value="尖">尖</option>
-            <option value="峰">峰</option>
-            <option value="平">平</option>
-            <option value="谷">谷</option>
+            <option value="尖峰">尖峰</option>
+            <option value="高峰">高峰</option>
+            <option value="平段">平段</option>
+            <option value="低谷">低谷</option>
           </select>
         </div>
-        <div class="form-group">
+<div class="form-group">
           <label class="form-label">开始时间</label>
           <input class="input" type="time" name="startTime" required>
         </div>

@@ -12,7 +12,7 @@
       <a class="<c:out value='${pvView == \"device_list\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=device_list">设备列表</a>
       <a class="<c:out value='${pvView == \"device_detail\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=device_detail">设备详情</a>
       <a class="<c:out value='${pvView == \"gen_data_list\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=gen_data_list">发电数据</a>
-      <a class="<c:out value='${pvView == \"forecast_list\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=forecast_list">预测优化</a>
+      <a class="<c:out value='${pvView == \"forecast_list\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=forecast_list">预测信息</a>
       <a class="<c:out value='${pvView == \"forecast_detail\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=forecast_detail">预测详情</a>
       <a class="<c:out value='${pvView == \"model_alert_list\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=model_alert_list">模型告警</a>
     </div>
@@ -47,11 +47,39 @@
       <p>按照设备类型与运行状态快速定位故障与离线设备。</p>
     </div>
 
+    <div class="pv-device-filter">
+      <form method="get" action="${ctx}/app" class="pv-sort-form">
+        <input type="hidden" name="module" value="pv"/>
+        <input type="hidden" name="view" value="device_list"/>
+        <label class="pv-sort-label">排序方式：</label>
+        <select name="sortBy" class="pv-sort-select">
+          <option value="deviceCode" <c:if test="${selectedSortBy == 'deviceCode'}">selected</c:if>>设备编号</option>
+          <option value="collectTime" <c:if test="${selectedSortBy == 'collectTime'}">selected</c:if>>采集时间</option>
+          <option value="capacity" <c:if test="${selectedSortBy == 'capacity'}">selected</c:if>>装机容量</option>
+          <option value="deviceType" <c:if test="${selectedSortBy == 'deviceType'}">selected</c:if>>设备类型</option>
+        </select>
+        <select name="sortOrder" class="pv-sort-select">
+          <option value="ASC" <c:if test="${selectedSortOrder == 'ASC'}">selected</c:if>>升序</option>
+          <option value="DESC" <c:if test="${selectedSortOrder == 'DESC' || empty selectedSortOrder}">selected</c:if>>降序</option>
+        </select>
+        <button type="submit" class="pv-sort-btn">排序</button>
+      </form>
+    </div>
+
     <div class="pv-device-grid">
       <c:forEach items="${devices}" var="device">
         <div class="pv-device-card">
-          <div class="pv-device-name">${device.deviceCode}（${device.deviceType}）</div>
-          <span class="pv-device-status online"><c:out value="${device.runStatus}" default="未知"/></span>
+          <div class="pv-device-card-header">
+            <div class="pv-device-name">${device.deviceCode}（${device.deviceType}）</div>
+            <c:choose>
+              <c:when test="${device.runStatus == '故障' || device.runStatus == '异常' || device.runStatus == '离线'}">
+                <span class="pv-device-status maintenance"><c:out value="${device.runStatus}" default="未知"/></span>
+              </c:when>
+              <c:otherwise>
+                <span class="pv-device-status online"><c:out value="${device.runStatus}" default="未知"/></span>
+              </c:otherwise>
+            </c:choose>
+          </div>
           <div class="pv-device-metrics">
             <div class="pv-device-metric">
               <div class="pv-device-metric-label">装机容量</div>
@@ -69,6 +97,9 @@
               <div class="pv-device-metric-label">采集时间</div>
               <div class="pv-device-metric-value"><c:out value="${device.collectTime}" default="-"/></div>
             </div>
+          </div>
+          <div class="pv-device-card-footer">
+            <a href="${ctx}/app?module=pv&view=device_detail&id=${device.deviceId}" class="pv-device-detail-btn">查看详情 →</a>
           </div>
         </div>
       </c:forEach>

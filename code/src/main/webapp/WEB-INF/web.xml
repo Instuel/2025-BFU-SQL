@@ -59,6 +59,16 @@
     <url-pattern>/app/*</url-pattern>
   </servlet-mapping>
 
+  <!-- 企业管理层大屏 API（业务线5：自定义/分钟级刷新） -->
+  <servlet>
+    <servlet-name>ExecDashboardServlet</servlet-name>
+    <servlet-class>com.bjfu.energy.controller.ExecDashboardServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>ExecDashboardServlet</servlet-name>
+    <url-pattern>/execDashboard</url-pattern>
+  </servlet-mapping>
+
   <!-- 系统管理员 Servlet：账号管理 -->
   <servlet>
     <servlet-name>AdminServlet</servlet-name>

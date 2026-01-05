@@ -13,7 +13,7 @@
       <a class="<c:out value='${pvView == \"device_list\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=device_list">设备列表</a>
       <a class="<c:out value='${pvView == \"device_detail\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=device_detail">设备详情</a>
       <a class="<c:out value='${pvView == \"gen_data_list\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=gen_data_list">发电数据</a>
-      <a class="<c:out value='${pvView == \"forecast_list\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=forecast_list">预测优化</a>
+      <a class="<c:out value='${pvView == \"forecast_list\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=forecast_list">预测信息</a>
       <a class="<c:out value='${pvView == \"forecast_detail\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=forecast_detail">预测详情</a>
       <a class="<c:out value='${pvView == \"model_alert_list\" ? \"active\" : \"\"}'/>" href="${ctx}/app?module=pv&view=model_alert_list">模型告警</a>
     </div>
@@ -40,7 +40,19 @@
   <div class="pv-section" style="margin-top: var(--spacing-xl);">
     <div class="pv-table-header">
       <div class="pv-table-title">模型告警列表</div>
-      <span class="pv-text-badge danger">偏差率超 15%</span>
+      <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+        <form method="get" action="${ctx}/app" style="display: flex; align-items: center; gap: var(--spacing-sm);">
+          <input type="hidden" name="module" value="pv"/>
+          <input type="hidden" name="view" value="model_alert_list"/>
+          <label class="pv-filter-label" style="margin-bottom: 0;">状态筛选：</label>
+          <select name="statusFilter" class="pv-sort-select" onchange="this.form.submit()">
+            <option value="">全部</option>
+            <option value="未处理" <c:if test="${selectedStatusFilter == '未处理'}">selected</c:if>>未处理</option>
+            <option value="待处理" <c:if test="${selectedStatusFilter == '待处理'}">selected</c:if>>紧急处理</option>
+          </select>
+        </form>
+        <span class="pv-text-badge danger">偏差率超 15%</span>
+      </div>
     </div>
     <div class="table-container">
       <table class="data-table">

@@ -68,6 +68,7 @@
       </c:if>
       </tbody>
     </table>
+<<<<<<< HEAD
     
     <c:if test="${circuitTotalCount > 0}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;">
@@ -86,6 +87,8 @@
         </div>
       </div>
     </c:if>
+=======
+>>>>>>> origin/main
   </div>
 </div>
 

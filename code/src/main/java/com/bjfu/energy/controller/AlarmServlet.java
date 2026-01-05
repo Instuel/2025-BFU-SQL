@@ -217,7 +217,8 @@ public class AlarmServlet extends HttpServlet {
         String reviewStatus = req.getParameter("reviewStatus");
         String currentRoleType = (String) req.getSession().getAttribute("currentRoleType");
         
-        List<WorkOrder> orders;
+        List<WorkOrder> orders = alarmService.listWorkOrders(reviewStatus);
+
         if ("OM".equals(currentRoleType)) {
             Long userOandmId = null;
             com.bjfu.energy.entity.SysUser currentUser = (com.bjfu.energy.entity.SysUser) req.getSession().getAttribute("currentUser");
@@ -232,7 +233,7 @@ public class AlarmServlet extends HttpServlet {
         } else {
             orders = alarmService.listWorkOrders(reviewStatus);
         }
-
+       
         int total = orders.size();
         int pending = 0;
         int processing = 0;
@@ -397,7 +398,7 @@ public class AlarmServlet extends HttpServlet {
         order.setDispatchTime(parseDateTime(req.getParameter("dispatchTime")));
         order.setResultDesc(req.getParameter("resultDesc"));
         order.setReviewStatus(req.getParameter("reviewStatus"));
-        String attachmentPath = handleAttachmentUpload(req, null);
+        String attachmentPath = handleAttachmentUpload(req, req.getParameter("attachmentPath"));
         order.setAttachmentPath(attachmentPath);
 
         Long id = alarmService.createWorkOrder(order);
@@ -417,7 +418,7 @@ public class AlarmServlet extends HttpServlet {
         order.setFinishTime(parseDateTime(req.getParameter("finishTime")));
         order.setResultDesc(req.getParameter("resultDesc"));
         order.setReviewStatus(req.getParameter("reviewStatus"));
-        String attachmentPath = handleAttachmentUpload(req, null);
+        String attachmentPath = handleAttachmentUpload(req, req.getParameter("attachmentPath"));
         order.setAttachmentPath(attachmentPath);
 
         alarmService.updateWorkOrder(order);
@@ -508,19 +509,19 @@ public class AlarmServlet extends HttpServlet {
 
         long maxSize = 10 * 1024 * 1024;
         if (part.getSize() > maxSize) {
-            return null;
+            return fallbackPath;
         }
 
         String submittedFileName = part.getSubmittedFileName();
         if (submittedFileName == null || submittedFileName.trim().isEmpty()) {
-            return null;
+            return fallbackPath;
         }
 
-        String fileName = submittedFileName.toLowerCase();
+        String fileName1 = submittedFileName.toLowerCase();
         String[] allowedExtensions = {".png", ".jpg", ".jpeg", ".pdf", ".doc", ".docx"};
         boolean isValidExtension = false;
         for (String ext : allowedExtensions) {
-            if (fileName.endsWith(ext)) {
+            if (fileName1.endsWith(ext)) {
                 isValidExtension = true;
                 break;
             }
