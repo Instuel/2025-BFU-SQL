@@ -13,8 +13,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class ExecDashboardDao {
 
@@ -148,6 +150,203 @@ public class ExecDashboardDao {
         return list;
     }
 
+
+    /**
+     * 业务线5：大屏展示配置（Dashboard_Config）。
+     * <p>
+     * exec_screen.jsp 会展示该表内容；此前如果没有在 Router 里设置 screenConfigs，会一直显示“暂无配置数据”。
+     * 这里同时兼容基础建表（只有 Refresh_Rate）与增强补丁（Refresh_Interval/Refresh_Unit/Config_Code）。
+     * </p>
+     */
+    public List<Map<String, Object>> listDashboardConfigs() throws Exception {
+        if (!tableExists("dbo.Dashboard_Config")) {
+            return new ArrayList<>();
+        }
+
+        try (Connection conn = DBUtil.getConnection()) {
+            boolean hasConfigCode = hasColumn(conn, "dbo.Dashboard_Config", "Config_Code");
+            boolean hasRefreshInterval = hasColumn(conn, "dbo.Dashboard_Config", "Refresh_Interval");
+            boolean hasRefreshUnit = hasColumn(conn, "dbo.Dashboard_Config", "Refresh_Unit");
+            boolean hasRefreshRate = hasColumn(conn, "dbo.Dashboard_Config", "Refresh_Rate");
+            boolean hasModuleName = hasColumn(conn, "dbo.Dashboard_Config", "Module_Name");
+            boolean hasDisplayFields = hasColumn(conn, "dbo.Dashboard_Config", "Display_Fields");
+            boolean hasSortRule = hasColumn(conn, "dbo.Dashboard_Config", "Sort_Rule");
+            boolean hasAuthLevel = hasColumn(conn, "dbo.Dashboard_Config", "Auth_Level");
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("SELECT Config_ID AS configId");
+            sb.append(hasConfigCode ? ", ISNULL(Config_Code,'-') AS configCode" : ", '-' AS configCode");
+            sb.append(hasModuleName ? ", ISNULL(Module_Name,'-') AS moduleName" : ", '-' AS moduleName");
+            sb.append(hasRefreshInterval ? ", ISNULL(Refresh_Interval,0) AS refreshInterval" : ", NULL AS refreshInterval");
+            sb.append(hasRefreshUnit ? ", ISNULL(Refresh_Unit,'') AS refreshUnit" : ", NULL AS refreshUnit");
+            sb.append(hasRefreshRate ? ", ISNULL(Refresh_Rate,'') AS refreshRate" : ", NULL AS refreshRate");
+            sb.append(hasDisplayFields ? ", ISNULL(Display_Fields,'') AS displayFields" : ", '' AS displayFields");
+            sb.append(hasSortRule ? ", ISNULL(Sort_Rule,'') AS sortRule" : ", '' AS sortRule");
+            sb.append(hasAuthLevel ? ", ISNULL(Auth_Level,'') AS authLevel" : ", '' AS authLevel");
+            sb.append(" FROM dbo.Dashboard_Config ORDER BY Config_ID ASC");
+
+            List<Map<String, Object>> list = new ArrayList<>();
+            try (PreparedStatement ps = conn.prepareStatement(sb.toString());
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> row = mapRow(rs);
+
+                    // 统一字段到 JSP 期望的类型/默认值
+                    int interval = toIntOrZero(row.get("refreshInterval"));
+                    String unit = row.get("refreshUnit") == null ? "" : String.valueOf(row.get("refreshUnit")).trim();
+
+                    // 基础表只有 Refresh_Rate：尝试拆解为 interval + unit
+                    if ((interval <= 0 || unit.isEmpty()) && row.get("refreshRate") != null) {
+                        String refreshRate = String.valueOf(row.get("refreshRate")).trim();
+                        RefreshParts parts = parseRefreshRate(refreshRate);
+                        if (interval <= 0 && parts.interval > 0) {
+                            interval = parts.interval;
+                        }
+                        if (unit.isEmpty() && parts.unit != null) {
+                            unit = parts.unit;
+                        }
+                        // 如果依然没解析出来，就把 Refresh_Rate 直接放到单位字段里，至少页面能看到
+                        if (interval <= 0 && unit.isEmpty()) {
+                            unit = refreshRate;
+                        }
+                    }
+
+                    row.put("refreshInterval", interval);
+                    row.put("refreshUnit", unit);
+
+                    if (row.get("configCode") == null) row.put("configCode", "-");
+                    if (row.get("moduleName") == null) row.put("moduleName", "-");
+                    if (row.get("displayFields") == null) row.put("displayFields", "");
+                    if (row.get("sortRule") == null) row.put("sortRule", "");
+                    if (row.get("authLevel") == null) row.put("authLevel", "");
+
+                    // 需求：告警字段补齐高/中/低（避免配置表里仍然只显示“高告警”）。
+                    String moduleName = String.valueOf(row.get("moduleName"));
+                    String displayFields = String.valueOf(row.get("displayFields"));
+                    row.put("displayFields", normalizeDashboardDisplayFields(moduleName, displayFields));
+
+                    list.add(row);
+                }
+            }
+            return list;
+        }
+    }
+
+    /**
+     * 统一/补齐 Dashboard_Config.Display_Fields 的展示内容（仅影响页面展示，不回写数据库）。
+     * <p>
+     * 典型场景：告警总览字段原来只有 [Total_Alarm, High_Alarm]，这里自动补齐 Mid_Alarm / Low_Alarm。
+     * 兼容存储格式：
+     * - JSON 风格：{"kpi":["Total_Alarm","High_Alarm"]}
+     * - CSV 风格：Total_Alarm,High_Alarm
+     * </p>
+     */
+    private String normalizeDashboardDisplayFields(String moduleName, String displayFields) {
+        String s = displayFields == null ? "" : displayFields.trim();
+
+        boolean isAlarmModule = (moduleName != null && moduleName.contains("告警"))
+                || s.contains("Total_Alarm")
+                || s.contains("High_Alarm");
+        if (!isAlarmModule) {
+            return s;
+        }
+
+        // 若为空，给一个默认值
+        if (s.isEmpty()) {
+            return "{\"kpi\":[\"Total_Alarm\",\"High_Alarm\",\"Mid_Alarm\",\"Low_Alarm\"]}";
+        }
+
+        // 从 JSON 数组 / CSV 中抽取字段
+        List<String> parsed = new ArrayList<>();
+        int l = s.indexOf('[');
+        int r = (l >= 0) ? s.indexOf(']', l + 1) : -1;
+        if (l >= 0 && r > l) {
+            String inner = s.substring(l + 1, r);
+            String[] parts = inner.split(",");
+            for (String p : parts) {
+                if (p == null) continue;
+                String t = p.replace("\"", "").replace("'", "").trim();
+                if (!t.isEmpty()) parsed.add(t);
+            }
+        } else {
+            String[] parts = s.split(",");
+            for (String p : parts) {
+                if (p == null) continue;
+                String t = p.replace("\"", "").replace("'", "").trim();
+                if (!t.isEmpty()) parsed.add(t);
+            }
+        }
+
+        // 用 LinkedHashSet 去重并保持顺序；同时按固定顺序补齐
+        Set<String> set = new LinkedHashSet<>(parsed);
+        set.add("Total_Alarm");
+        set.add("High_Alarm");
+        set.add("Mid_Alarm");
+        set.add("Low_Alarm");
+
+        // 统一按固定顺序输出
+        List<String> ordered = new ArrayList<>();
+        for (String k : new String[]{"Total_Alarm", "High_Alarm", "Mid_Alarm", "Low_Alarm"}) {
+            if (set.contains(k)) {
+                ordered.add(k);
+            }
+        }
+
+        // 仍保持 JSON 风格输出，和原表数据一致（便于你肉眼核对）
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"kpi\":[");
+        for (int i = 0; i < ordered.size(); i++) {
+            if (i > 0) sb.append(',');
+            sb.append('"').append(ordered.get(i)).append('"');
+        }
+        sb.append("]}");
+        return sb.toString();
+    }
+
+    private boolean tableExists(String fullName) throws Exception {
+        String sql = "SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(?) AND type = 'U'";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, fullName);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    private boolean hasColumn(Connection conn, String fullTableName, String columnName) throws Exception {
+        String sql = "SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(?) AND name = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, fullTableName);
+            ps.setString(2, columnName);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    private static class RefreshParts {
+        int interval;
+        String unit;
+        RefreshParts(int interval, String unit) { this.interval = interval; this.unit = unit; }
+    }
+
+    /**
+     * 解析 Refresh_Rate（兼容：'10分钟' '5 min' '每10分钟' '分钟级' 等）
+     */
+    private RefreshParts parseRefreshRate(String refreshRate) {
+        if (refreshRate == null) return new RefreshParts(0, "");
+        String s = refreshRate.trim();
+        // 去掉常见前缀
+        s = s.replace("每", "").replace("分钟级", "1分钟").replace("小时级", "1小时").replace("日级", "1天");
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d+)").matcher(s);
+        int interval = 0;
+        if (m.find()) {
+            try { interval = Integer.parseInt(m.group(1)); } catch (Exception ignore) {}
+        }
+        String unit = s.replaceAll("\\d+", "").trim();
+        return new RefreshParts(interval, unit);
+    }
     /**
      * 业务线5：能耗溯源（Top-N 厂区能耗占比）。
      * period 可选：month（本月）/quarter（本季度）。
@@ -246,10 +445,57 @@ public class ExecDashboardDao {
         if (row.containsKey("statTime") && row.get("statTime") instanceof Timestamp) {
             row.put("statTime", ((Timestamp) row.get("statTime")).toLocalDateTime().toString().replace('T', ' '));
         }
-        // 某些 JDBC 返回 BigDecimal/Double，JSP fmt 都能处理，这里不强转
-        row.putIfAbsent("totalKwh", BigDecimal.ZERO);
-        row.putIfAbsent("pvGenKwh", BigDecimal.ZERO);
-        row.putIfAbsent("totalAlarm", 0);
+
+        // 说明：JSP 使用 <fmt:formatNumber>，如果值为 null 会渲染为空；
+        // 为了避免“看起来像没数据”，这里把缺失/为 null 的数值统一兜底为 0。
+
+        row.put("totalKwh", toBigDecimalOrZero(row.get("totalKwh")));
+        row.put("totalWaterM3", toBigDecimalOrZero(row.get("totalWaterM3")));
+        row.put("totalSteamT", toBigDecimalOrZero(row.get("totalSteamT")));
+        row.put("totalGasM3", toBigDecimalOrZero(row.get("totalGasM3")));
+        row.put("pvGenKwh", toBigDecimalOrZero(row.get("pvGenKwh")));
+
+        // 光伏自用：如果统计表没写入该字段，则按固定比例估算（用于展示）。
+        if (row.get("pvSelfKwh") == null) {
+            BigDecimal pvGen = (BigDecimal) row.get("pvGenKwh");
+            row.put("pvSelfKwh", pvGen.multiply(SELF_USE_RATE).setScale(3, RoundingMode.HALF_UP));
+        } else {
+            row.put("pvSelfKwh", toBigDecimalOrZero(row.get("pvSelfKwh")));
+        }
+
+        row.put("totalAlarm", toIntOrZero(row.get("totalAlarm")));
+        row.put("alarmHigh", toIntOrZero(row.get("alarmHigh")));
+        row.put("alarmMid", toIntOrZero(row.get("alarmMid")));
+        row.put("alarmLow", toIntOrZero(row.get("alarmLow")));
+        row.put("alarmUnprocessed", toIntOrZero(row.get("alarmUnprocessed")));
+    }
+
+    private BigDecimal toBigDecimalOrZero(Object val) {
+        if (val == null) {
+            return BigDecimal.ZERO;
+        }
+        if (val instanceof BigDecimal) {
+            return (BigDecimal) val;
+        }
+        if (val instanceof Number) {
+            // JDBC 可能返回 Double/Long 等，统一转 BigDecimal
+            return new BigDecimal(((Number) val).toString());
+        }
+        try {
+            return new BigDecimal(val.toString());
+        } catch (Exception e) {
+            return BigDecimal.ZERO;
+        }
+    }
+
+    private int toIntOrZero(Object val) {
+        if (val == null) return 0;
+        if (val instanceof Number) return ((Number) val).intValue();
+        try {
+            return Integer.parseInt(val.toString());
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     private Map<String, Object> computeRealtimeFallback() throws Exception {

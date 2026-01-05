@@ -1,10 +1,48 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="fmt" uri="http://java.sun.com/jsp/jstl/fmt" %>
+<%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
 <%@ include file="/WEB-INF/jsp/common/header.jsp" %>
 <%@ include file="/WEB-INF/jsp/common/sidebar.jsp" %>
 
 <c:set var="ctx" value="${pageContext.request.contextPath}"/>
+
+<style>
+  /* Dashboard_Config: 展示字段美化（badge + 复制） */
+  .df-wrap{
+    display:flex; align-items:center; gap:10px;
+    padding:8px 10px;
+    border:1px solid #eef1f6;
+    border-radius:10px;
+    background:#fafbff;
+  }
+  .df-badges{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .df-badge{
+    display:inline-flex; align-items:center;
+    padding:3px 10px; border-radius:999px;
+    font-size:12px; line-height:18px;
+    border:1px solid #e5e7eb;
+    background:#fff;
+    color:#334155;
+    white-space:nowrap;
+  }
+  .df-badge.muted{
+    background:#f3f4f6;
+    color:#475569;
+  }
+  .df-copy{
+    margin-left:auto;
+    border:1px solid #e5e7eb;
+    background:#fff;
+    border-radius:8px;
+    padding:4px 8px;
+    cursor:pointer;
+    font-size:12px;
+    color:#64748b;
+  }
+  .df-copy:hover{ background:#f8fafc; }
+</style>
+
 
 <div class="main-content dashboard-page">
   <div class="dashboard-container exec-screen">
@@ -338,7 +376,12 @@
                     <c:out value="${cfg.refreshInterval}"/>
                     <c:out value="${cfg.refreshUnit}"/>
                   </td>
-                  <td class="cell-wrap"><c:out value="${cfg.displayFields}"/></td>
+                  <td class="cell-wrap">
+                    <div class="df-wrap" data-json='${fn:escapeXml(cfg.displayFields)}'>
+                      <div class="df-badges"></div>
+                      <button type="button" class="df-copy" title="复制配置">⧉</button>
+                    </div>
+                  </td>
                   <td><c:out value="${cfg.sortRule}"/></td>
                   <td><c:out value="${cfg.authLevel}"/></td>
                 </tr>
@@ -374,7 +417,9 @@
             <th>光伏总发电量(kWh)</th>
             <th>光伏自用电量(kWh)</th>
             <th>总告警次数</th>
-            <th>高/中/低告警数</th>
+            <th>高告警数</th>
+            <th>中告警数</th>
+            <th>低告警数</th>
           </tr>
           </thead>
           <tbody>
@@ -387,10 +432,14 @@
             <td id="rt_td_pvgen"><fmt:formatNumber value="${screenRealtime.pvGenKwh}" pattern="#,#00.###"/></td>
             <td id="rt_td_pvself"><fmt:formatNumber value="${screenRealtime.pvSelfKwh}" pattern="#,#00.###"/></td>
             <td id="rt_td_alarm"><c:out value="${screenRealtime.totalAlarm}"/></td>
-            <td id="rt_td_alarm_split">
-              <span class="workbench-tag danger">高 <span id="rt_alarmHigh"><c:out value="${screenRealtime.alarmHigh}"/></span></span>
-              <span class="workbench-tag warning">中 <span id="rt_alarmMid"><c:out value="${screenRealtime.alarmMid}"/></span></span>
-              <span class="workbench-tag info">低 <span id="rt_alarmLow"><c:out value="${screenRealtime.alarmLow}"/></span></span>
+            <td>
+              <span class="workbench-tag danger"><span id="rt_alarmHigh"><c:out value="${screenRealtime.alarmHigh}"/></span></span>
+            </td>
+            <td>
+              <span class="workbench-tag warning"><span id="rt_alarmMid"><c:out value="${screenRealtime.alarmMid}"/></span></span>
+            </td>
+            <td>
+              <span class="workbench-tag info"><span id="rt_alarmLow"><c:out value="${screenRealtime.alarmLow}"/></span></span>
             </td>
           </tr>
           </tbody>
@@ -434,7 +483,26 @@
         <div>
           <c:choose>
             <c:when test="${empty screenTrends}">
-              <div class="dashboard-empty">暂无历史趋势数据（请确认 Stat_History_Trend 已插入测试数据）。</div>
+              <div class="dashboard-empty">
+                暂无历史趋势数据（请确认 Stat_History_Trend 已插入测试数据）。
+                <c:if test="${not empty trendDebug}">
+                  <div style="margin-top:8px; font-size:12px; color:#7a8599; line-height:1.6;">
+                    <div>自检：当前连接数据库：<b><c:out value="${trendDebug.dbName}"/></b></div>
+                    <div>Stat_History_Trend 总行数：<b><c:out value="${trendDebug.totalRows}"/></b>；当前筛选（<c:out value="${trendEnergyType}"/> / <c:out value="${trendCycle}"/>）命中：<b><c:out value="${trendDebug.matchedRows}"/></b></div>
+                    <c:if test="${not empty trendDebug.combos}">
+                      <div>表内可用组合（Energy_Type/Stat_Cycle）：
+                        <c:forEach items="${trendDebug.combos}" var="c" varStatus="st">
+                          <c:out value="${c}"/><c:out value='${st.last ? "" : "，"}'/>
+                        </c:forEach>
+                      </div>
+                    </c:if>
+                    <div style="margin-top:6px;">建议在你执行补丁的同一个库里验证：</div>
+                    <div style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace;">
+                      SELECT DB_NAME() AS dbName, COUNT(*) AS cnt FROM Stat_History_Trend WHERE Energy_Type=N'电' AND Stat_Cycle=N'月';
+                    </div>
+                  </div>
+                </c:if>
+              </div>
             </c:when>
             <c:otherwise>
               <div class="table-container">
@@ -925,10 +993,97 @@
   });
 
 
+
+  // Dashboard_Config: 将“展示字段(JSON)”渲染成标签（badge），并支持一键复制
+  function renderDisplayFieldsBadges(){
+    const labelMap = {
+      Total_KWH: "总用电量",
+      YOY: "同比",
+      MOM: "环比",
+      PV_Gen_KWH: "光伏发电量",
+      Inverter_Eff: "逆变器效率",
+      Total_Alarm: "告警总数",
+      High_Alarm: "高告警",
+      Mid_Alarm: "中告警",
+      Low_Alarm: "低告警"
+    };
+
+    function safeParse(s){
+      if(!s) return null;
+      try{ return JSON.parse(s); }catch(e){ return null; }
+    }
+
+    document.querySelectorAll(".df-wrap").forEach(function(wrap){
+      const raw = String(wrap.getAttribute("data-json") || "").trim();
+      const box = wrap.querySelector(".df-badges");
+      const btn = wrap.querySelector(".df-copy");
+      if(!box) return;
+
+      const obj = safeParse(raw);
+      let items = [];
+
+      if(obj && typeof obj === "object"){
+        if(Array.isArray(obj.kpi)) items = obj.kpi.slice();
+        else{
+          for(const k in obj){
+            if(Array.isArray(obj[k])) items.push.apply(items, obj[k].map(v => (k + ":" + v)));
+            else items.push(k + ":" + obj[k]);
+          }
+        }
+      }
+
+      // 解析失败/空：降级显示原文（但仍用 badge）
+      if(!items.length){
+        const txt = raw ? raw : "-";
+        box.innerHTML = '<span class="df-badge muted" title="' + txt.replace(/"/g,'&quot;') + '">配置</span>';
+      }else{
+        const maxShow = 4;
+        const show = items.slice(0, maxShow);
+        const hidden = items.length - show.length;
+
+        const html = [];
+        show.forEach(function(key){
+          const text = labelMap[key] || key;
+          html.push('<span class="df-badge" title="' + String(key).replace(/"/g,'&quot;') + '">' + String(text) + '</span>');
+        });
+        if(hidden > 0){
+          html.push('<span class="df-badge muted" title="' + items.join(", ").replace(/"/g,'&quot;') + '">+' + hidden + '</span>');
+        }
+        box.innerHTML = html.join("");
+      }
+
+      // 整格 hover 显示原始 JSON
+      if(raw) wrap.title = raw;
+
+      if(btn){
+        btn.addEventListener("click", async function(e){
+          e.preventDefault();
+          e.stopPropagation();
+          const txt = raw || "";
+          try{
+            await navigator.clipboard.writeText(txt);
+          }catch(err){
+            const ta = document.createElement("textarea");
+            ta.value = txt;
+            document.body.appendChild(ta);
+            ta.select();
+            try{ document.execCommand("copy"); }catch(e2){}
+            document.body.removeChild(ta);
+          }
+          btn.textContent = "✓";
+          setTimeout(function(){ btn.textContent = "⧉"; }, 800);
+        });
+      }
+    });
+  }
+
+
+
   // init
   const prefs = loadPrefs();
   syncModalFromPrefs(prefs);
   applyPrefs(prefs);
+  renderDisplayFieldsBadges();
   fetchScreenData();
   analyzeTrends();
 })();

@@ -46,9 +46,30 @@ public class AppRouterServlet extends HttpServlet {
 
         String jsp;
         switch (module) {
-        case "dashboard":
-            roleType = getRoleType(req);
-            String viewParam = req.getParameter("view");
+            case "dashboard":
+                roleType = getRoleType(req);
+                // 企业管理层（EXEC）专属工作台 / 大屏 / 科研项目
+                // 说明：AuthServlet 登录后会跳到 /app?module=dashboard&view=execDesk
+                // 这里需要根据 view 做进一步分发。
+                if ("EXEC".equals(roleType)) {
+                    String view = req.getParameter("view");
+                    if (view == null || view.trim().isEmpty()) {
+                        view = "execDesk";
+                    }
+                    try {
+                        switch (view) {
+                            case "execDesk":
+                                // 仅展示入口卡片，无需加载重数据
+                                jsp = "/WEB-INF/jsp/exec/exec_desk.jsp";
+                                break;
+                            case "execScreen": {
+                                // 大屏：实时汇总 + 月度概览 + 光伏/配电统计 + 高等级告警 + 历史趋势
+                                req.setAttribute("monthlyOverview", execDashboardDao.getMonthlyOverview());
+                                req.setAttribute("screenRealtime", execDashboardDao.getRealtimeSummary());
+                                req.setAttribute("pvStats", pvDao.getPvStats());
+                                req.setAttribute("distStats", distMonitorDao.getRoomStats());
+                                req.setAttribute("highAlarms", execDashboardDao.listHighAlarms(6));
+                                req.setAttribute("screenConfigs", execDashboardDao.listDashboardConfigs());
 
             // 企业管理层（EXEC）+ 能源管理员（ENERGY）的大屏入口
             // 说明：
