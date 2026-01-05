@@ -16,6 +16,7 @@
         </div>
         <div class="exec-screen-actions">
           <button class="dashboard-btn" type="button" id="btnCustomize">自定义</button>
+          <a class="dashboard-btn" href="${ctx}/app?module=dashboard&view=execHighAlarm">高等级告警</a>
           <a class="dashboard-btn" href="${ctx}/app?module=dashboard&view=execDesk">← 返回工作台</a>
         </div>
       </div>
@@ -48,8 +49,23 @@
               <label class="exec-check"><input type="checkbox" data-pref-module="dist" checked/> 配电网运行状态</label>
               <label class="exec-check"><input type="checkbox" data-pref-module="alarm" checked/> 告警统计</label>
 
-              <div class="exec-modal-block-title" style="margin-top:14px;">刷新频率</div>
+              <div class="exec-modal-block-title" style="margin-top:14px;">模块排序</div>
+              <div class="dashboard-section-hint">拖拽/上下移动可调整模块在大屏中的展示顺序。</div>
+              <div class="exec-sort-list" id="prefOrderList"></div>
+
+              <div class="exec-modal-block-title" style="margin-top:14px;">布局</div>
               <div class="exec-inline">
+                <select class="dashboard-input" style="width:140px;" id="prefModuleCols">
+                  <option value="1">1 列</option>
+                  <option value="2" selected>2 列</option>
+                  <option value="3">3 列</option>
+                </select>
+                <span class="dashboard-section-hint">大屏模块列数（窄屏将自动变为 1 列）</span>
+              </div>
+
+              <div class="exec-modal-block-title" style="margin-top:14px;">自动刷新</div>
+              <div class="exec-inline">
+                <label class="exec-check" style="margin:0;"><input type="checkbox" id="prefRefreshEnabled" checked/> 启用</label>
                 <input class="dashboard-input" style="width:120px;" type="number" min="30" step="30" id="prefRefreshSec" value="60"/>
                 <span class="dashboard-section-hint">秒（推荐 60 秒：分钟级更新）</span>
               </div>
@@ -94,6 +110,9 @@
 
         <div class="exec-modal-footer">
           <button class="dashboard-btn" type="button" id="btnReset">恢复默认</button>
+          <button class="dashboard-btn" type="button" id="btnExport">导出配置</button>
+          <button class="dashboard-btn" type="button" id="btnImport">导入配置</button>
+          <input type="file" id="importFile" accept="application/json" style="display:none;"/>
           <button class="dashboard-btn primary" type="button" id="btnApply">应用</button>
         </div>
       </div>
@@ -268,7 +287,10 @@
                   </c:otherwise>
                 </c:choose>
               </div>
-              <div class="exec-kpi-sub">可在“接收高等级告警推送”入口查看详情</div>
+              <div class="exec-kpi-sub">
+                点击右上角“高等级告警”查看详情，或
+                <a class="link" href="${ctx}/app?module=dashboard&view=execHighAlarm">查看全部 →</a>
+              </div>
             </div>
           </div>
         </div>
@@ -496,17 +518,27 @@
 <script>
 (function(){
   const ctx = '${ctx}';
-  const PREF_KEY = 'execScreenPrefs_v1';
+  const userId = '${sessionScope.currentUser != null ? sessionScope.currentUser.userId : "0"}';
+  const PREF_KEY = 'execScreenPrefs_v2_' + userId;
 
   const modal = document.getElementById('customModal');
   const btnCustomize = document.getElementById('btnCustomize');
   const btnApply = document.getElementById('btnApply');
   const btnReset = document.getElementById('btnReset');
+  const btnExport = document.getElementById('btnExport');
+  const btnImport = document.getElementById('btnImport');
+  const importFile = document.getElementById('importFile');
   const refreshInput = document.getElementById('prefRefreshSec');
+  const refreshEnabled = document.getElementById('prefRefreshEnabled');
+  const moduleColsSel = document.getElementById('prefModuleCols');
+  const orderListEl = document.getElementById('prefOrderList');
 
   function defaultPrefs(){
     return {
+      refreshEnabled: true,
       refreshSec: 60,
+      moduleCols: 2,
+      moduleOrder: ['energy','pv','dist','alarm'],
       modules: {energy:true, pv:true, dist:true, alarm:true},
       fields: {
         energy:{totalKwh:true,totalWaterM3:true,totalSteamT:true,totalGasM3:true,monthlyCost:true,targetCompletion:true},
@@ -523,8 +555,19 @@
       if(!raw) return defaultPrefs();
       const p = JSON.parse(raw);
       const d = defaultPrefs();
-      // 轻量合并
+      // 轻量合并（向后兼容）
+      p.refreshEnabled = (p.refreshEnabled === false) ? false : true;
       p.refreshSec = Number(p.refreshSec || d.refreshSec);
+      p.moduleCols = Number(p.moduleCols || d.moduleCols);
+      p.moduleCols = Math.min(3, Math.max(1, p.moduleCols));
+
+      // moduleOrder 兼容：如果缺失则用默认；如包含未知模块则过滤
+      const order = Array.isArray(p.moduleOrder) ? p.moduleOrder.slice() : d.moduleOrder.slice();
+      const known = new Set(d.moduleOrder);
+      const filtered = order.filter(x=>known.has(x));
+      d.moduleOrder.forEach(x=>{ if(!filtered.includes(x)) filtered.push(x); });
+      p.moduleOrder = filtered;
+
       p.modules = Object.assign(d.modules, p.modules||{});
       p.fields = Object.assign(d.fields, p.fields||{});
       for(const k in d.fields){
@@ -551,24 +594,117 @@
 
   function syncModalFromPrefs(p){
     refreshInput.value = p.refreshSec;
+    if(refreshEnabled) refreshEnabled.checked = !!p.refreshEnabled;
+    if(moduleColsSel) moduleColsSel.value = String(p.moduleCols || 2);
+
     document.querySelectorAll('[data-pref-module]').forEach(cb=>{
       const m = cb.getAttribute('data-pref-module');
       cb.checked = !!p.modules[m];
     });
     document.querySelectorAll('[data-pref-field]').forEach(cb=>{
-      const [m,f] = cb.getAttribute('data-pref-field').split(':');
+      const parts = cb.getAttribute('data-pref-field').split(':');
+      const m = parts[0], f = parts[1];
       cb.checked = !!(p.fields[m] && p.fields[m][f]);
+    });
+
+    renderOrderList(p);
+  }
+
+
+  function moduleTitle(id){
+    const map = {energy:'能源总览', pv:'光伏总览', dist:'配电网运行状态', alarm:'告警统计'};
+    return map[id] || id;
+  }
+
+  function moveInArray(arr, fromIdx, toIdx){
+    const a = arr.slice();
+    const [item] = a.splice(fromIdx, 1);
+    a.splice(toIdx, 0, item);
+    return a;
+  }
+
+  function renderOrderList(p){
+    if(!orderListEl) return;
+    orderListEl.innerHTML = '';
+    const list = p.moduleOrder || ['energy','pv','dist','alarm'];
+
+    list.forEach((id, i)=>{
+      const row = document.createElement('div');
+      row.className = 'exec-sort-item';
+      row.draggable = true;
+      row.dataset.mid = id;
+
+      // 注意：JSP 会把“$ + 花括号”的写法当作 EL 表达式解析，因此这里用字符串拼接，避免模板字符串。
+      const title = moduleTitle(id);
+      const disableUp = (i === 0) ? 'disabled' : '';
+      const disableDown = (i === list.length - 1) ? 'disabled' : '';
+      row.innerHTML =
+        '<div class="exec-sort-left">'
+          + '<div class="exec-drag-handle" title="拖拽排序">⠿</div>'
+          + '<div class="exec-sort-name" title="' + title + '">' + title + '</div>'
+        + '</div>'
+        + '<div class="exec-sort-actions">'
+          + '<button type="button" class="exec-mini-btn" data-act="up" ' + disableUp + '>上移</button>'
+          + '<button type="button" class="exec-mini-btn" data-act="down" ' + disableDown + '>下移</button>'
+        + '</div>';
+
+      // 拖拽
+      row.addEventListener('dragstart', (e)=>{
+        e.dataTransfer.setData('text/plain', id);
+      });
+      row.addEventListener('dragover', (e)=>e.preventDefault());
+      row.addEventListener('drop', (e)=>{
+        e.preventDefault();
+        const fromId = e.dataTransfer.getData('text/plain');
+        const toId = id;
+        if(!fromId || fromId === toId) return;
+        const fromIdx = p.moduleOrder.indexOf(fromId);
+        const toIdx = p.moduleOrder.indexOf(toId);
+        if(fromIdx<0 || toIdx<0) return;
+        p.moduleOrder = moveInArray(p.moduleOrder, fromIdx, toIdx);
+        savePrefs(p);
+        renderOrderList(p);
+        applyPrefs(p);
+      });
+
+      // 上下移
+      row.querySelectorAll('button[data-act]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const act = btn.getAttribute('data-act');
+          const curIdx = p.moduleOrder.indexOf(id);
+          if(curIdx<0) return;
+          if(act==='up' && curIdx>0){
+            p.moduleOrder = moveInArray(p.moduleOrder, curIdx, curIdx-1);
+          } else if(act==='down' && curIdx<p.moduleOrder.length-1){
+            p.moduleOrder = moveInArray(p.moduleOrder, curIdx, curIdx+1);
+          }
+          savePrefs(p);
+          renderOrderList(p);
+          applyPrefs(p);
+        });
+      });
+
+      orderListEl.appendChild(row);
     });
   }
 
   function prefsFromModal(){
     const p = loadPrefs();
+    p.refreshEnabled = refreshEnabled ? !!refreshEnabled.checked : true;
     p.refreshSec = Math.max(30, Number(refreshInput.value||60));
+    if(moduleColsSel){
+      p.moduleCols = Math.min(3, Math.max(1, Number(moduleColsSel.value||2)));
+    }
+    if(!Array.isArray(p.moduleOrder) || !p.moduleOrder.length){
+      p.moduleOrder = ['energy','pv','dist','alarm'];
+    }
+
     document.querySelectorAll('[data-pref-module]').forEach(cb=>{
       p.modules[cb.getAttribute('data-pref-module')] = cb.checked;
     });
     document.querySelectorAll('[data-pref-field]').forEach(cb=>{
-      const [m,f] = cb.getAttribute('data-pref-field').split(':');
+      const parts = cb.getAttribute('data-pref-field').split(':');
+      const m = parts[0], f = parts[1];
       if(!p.fields[m]) p.fields[m] = {};
       p.fields[m][f] = cb.checked;
     });
@@ -576,11 +712,23 @@
   }
 
   function applyPrefs(p){
-    // 模块显示
+    // 布局：模块列数（窄屏由 CSS 媒体查询兜底）
+    const grid = document.getElementById('moduleGrid');
+    if(grid){
+      grid.style.setProperty('--exec-mod-cols', String(p.moduleCols || 2));
+      // 排序：按 moduleOrder 重新排列 DOM
+      if(Array.isArray(p.moduleOrder) && p.moduleOrder.length){
+        p.moduleOrder.forEach(mid=>{
+          const el = document.getElementById('mod_' + mid);
+          if(el) grid.appendChild(el);
+        });
+      }
+    }
+
+    // 模块显示 + 指标显示
     document.querySelectorAll('.exec-module').forEach(mod=>{
       const m = mod.getAttribute('data-module');
       mod.style.display = p.modules[m] ? '' : 'none';
-      // 指标显示
       mod.querySelectorAll('[data-field]').forEach(kpi=>{
         const f = kpi.getAttribute('data-field');
         const show = p.fields[m] ? !!p.fields[m][f] : true;
@@ -591,8 +739,11 @@
     // 刷新
     if(window.__exec_refresh_timer){
       clearInterval(window.__exec_refresh_timer);
+      window.__exec_refresh_timer = null;
     }
-    window.__exec_refresh_timer = setInterval(fetchScreenData, p.refreshSec * 1000);
+    if(p.refreshEnabled){
+      window.__exec_refresh_timer = setInterval(fetchScreenData, (p.refreshSec||60) * 1000);
+    }
   }
 
   function formatNumber(n){
@@ -639,7 +790,8 @@
 
         const pv = d.pvStats || {};
         setText('kpi_pvTodayGen', pv.todayGen==null?'--':formatNumber(pv.todayGen));
-        setText('kpi_pvDevice', `${pv.totalCount||0} / ${pv.normalCount||0} / ${pv.faultCount||0} / ${pv.offlineCount||0}`);
+        // 不要用模板字符串，避免被 JSP 当作 EL 解析
+        setText('kpi_pvDevice', (pv.totalCount||0) + ' / ' + (pv.normalCount||0) + ' / ' + (pv.faultCount||0) + ' / ' + (pv.offlineCount||0));
 
         const dist = d.distStats || {};
         setText('kpi_roomCount', dist.roomCount==null?'--':dist.roomCount);
@@ -656,9 +808,9 @@
           ul.innerHTML = list.length ? '' : '<li>暂无高等级告警</li>';
           list.slice(0,6).forEach(a=>{
             const li = document.createElement('li');
-            li.innerHTML = `<span class="workbench-tag danger">高</span>`+
-              `<span class="exec-alarm-time">${a.occurTime||''}</span>`+
-              `<span class="exec-alarm-content"></span>`;
+            li.innerHTML = '<span class="workbench-tag danger">高</span>'
+              + '<span class="exec-alarm-time">' + (a.occurTime||'') + '</span>'
+              + '<span class="exec-alarm-content"></span>';
             li.querySelector('.exec-alarm-content').textContent = a.content || '';
             ul.appendChild(li);
           });
@@ -686,8 +838,8 @@
       const ly = Number(lastRow.getAttribute('data-yoy'));
       const lm = Number(lastRow.getAttribute('data-mom'));
       const flags = [];
-      if(isFinite(ly)) flags.push(`同比${ly>=0?'↑':'↓'}${Math.abs(ly)}%`);
-      if(isFinite(lm)) flags.push(`环比${lm>=0?'↑':'↓'}${Math.abs(lm)}%`);
+      if(isFinite(ly)) flags.push('同比' + (ly>=0?'↑':'↓') + Math.abs(ly) + '%');
+      if(isFinite(lm)) flags.push('环比' + (lm>=0?'↑':'↓') + Math.abs(lm) + '%');
       setText('an_flags', flags.length?flags.join('，'):'--');
 
       let hint = '建议：保持监控，结合产线/气候/检修因素做解释。';
@@ -728,6 +880,50 @@
     applyPrefs(p);
     closeModal();
   });
+
+
+  // 导出/导入
+  function downloadJson(filename, obj){
+    const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 300);
+  }
+
+  btnExport && btnExport.addEventListener('click', ()=>{
+    const p = loadPrefs();
+    downloadJson('exec_screen_prefs.json', p);
+  });
+
+  btnImport && btnImport.addEventListener('click', ()=>{
+    if(importFile) importFile.click();
+  });
+
+  importFile && importFile.addEventListener('change', ()=>{
+    const f = importFile.files && importFile.files[0];
+    if(!f) return;
+    const rd = new FileReader();
+    rd.onload = ()=>{
+      try{
+        const obj = JSON.parse(String(rd.result||'{}'));
+        const d = defaultPrefs();
+        const merged = Object.assign(d, obj||{});
+        savePrefs(merged);
+        syncModalFromPrefs(merged);
+        applyPrefs(merged);
+      }catch(e){
+        alert('导入失败：配置文件不是合法 JSON');
+      }finally{
+        importFile.value = '';
+      }
+    };
+    rd.readAsText(f, 'utf-8');
+  });
+
 
   // init
   const prefs = loadPrefs();

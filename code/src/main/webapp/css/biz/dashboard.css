@@ -1271,7 +1271,7 @@
 
 .exec-module-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--exec-mod-cols, 2), minmax(0, 1fr));
     gap: 14px;
 }
 
@@ -1545,16 +1545,142 @@
     margin-bottom: 6px;
 }
 
+
+/* EXEC 大屏：排序/布局增强 */
+.exec-sort-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin-top:10px;
+}
+.exec-sort-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:8px 10px;
+    border:1px solid rgba(0,0,0,0.08);
+    border-radius:12px;
+    background:#fff;
+}
+.exec-sort-left{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-width:0;
+}
+.exec-drag-handle{
+    width:26px;
+    height:26px;
+    border-radius:10px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:rgba(17,24,39,0.05);
+    border:1px solid rgba(17,24,39,0.10);
+    cursor:grab;
+    flex:0 0 auto;
+    user-select:none;
+}
+.exec-sort-name{
+    font-size:13px;
+    font-weight:800;
+    color:#111827;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:180px;
+}
+.exec-sort-actions{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex:0 0 auto;
+}
+.exec-mini-btn{
+    border:1px solid rgba(0,0,0,0.12);
+    background:#fff;
+    border-radius:10px;
+    padding:6px 10px;
+    font-size:12px;
+    cursor:pointer;
+}
+.exec-mini-btn:hover{ background:rgba(0,0,0,0.03); }
+.exec-mini-btn.danger{
+    border-color: rgba(239,68,68,0.35);
+    color:#b91c1c;
+    background: rgba(239,68,68,0.06);
+}
+
+/* EXEC 科研项目页：美化 */
+.exec-project-hero{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+}
+.exec-project-hero .hero-title{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+.exec-project-hero .hero-title h1{
+    margin:0;
+}
+.exec-project-hero .hero-badge{
+    padding:4px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:800;
+    background: rgba(59,130,246,0.10);
+    color:#1d4ed8;
+    border:1px solid rgba(59,130,246,0.25);
+}
+.exec-stat-grid{
+    display:grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap:12px;
+    margin: 12px 0 16px 0;
+}
+@media (max-width: 1100px){
+    .exec-stat-grid{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (max-width: 560px){
+    .exec-stat-grid{ grid-template-columns: 1fr; }
+}
+.exec-stat-card{
+    border:1px solid rgba(0,0,0,0.08);
+    border-radius:14px;
+    padding:12px;
+    background:#fff;
+}
+.exec-stat-k{ font-size:12px; color:#667085; }
+.exec-stat-v{ margin-top:6px; font-size:22px; font-weight:900; color:#111827; }
+.exec-stat-sub{ margin-top:6px; font-size:12px; color:#667085; }
+
+.exec-form-hint{
+    margin-top:10px;
+    padding:10px 12px;
+    border-radius:12px;
+    border:1px dashed rgba(17,24,39,0.18);
+    background: rgba(248,250,252,0.8);
+    color:#344054;
+    font-size:13px;
+}
+.exec-required{
+    color:#ef4444;
+    font-weight:900;
+    margin-left:4px;
+}
+
 /* 科研项目页布局 */
 .exec-two-col {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* 申报 + 结题：按上下布局（用户要求在宽屏也上下分配） */
+    grid-template-columns: 1fr;
     gap: 14px;
 }
 
-@media (max-width: 1000px) {
-    .exec-two-col { grid-template-columns: 1fr; }
-}
 
 .row-sub td { background: rgba(248,250,252,0.8); }
 .subtext { font-size: 13px; color: #344054; margin: 4px 0; }

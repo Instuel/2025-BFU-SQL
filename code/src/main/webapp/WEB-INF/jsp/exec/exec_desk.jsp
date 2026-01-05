@@ -9,7 +9,7 @@
   <div class="dashboard-container exec-desk">
     <div class="dashboard-header">
       <h1>企业管理层工作台</h1>
-      <p>四个入口直达：大屏、告警推送、能耗总结、科研项目。</p>
+      <p>三个入口直达：大屏、能耗总结、科研项目（高等级告警请在大屏中查看）。</p>
     </div>
 
     <div class="exec-entry-grid">
@@ -18,13 +18,6 @@
         <div class="exec-entry-title">大屏</div>
         <div class="exec-entry-desc">查看大屏展示配置、实时汇总与历史趋势。</div>
         <div class="exec-entry-meta">业务线5 · 实时/趋势</div>
-      </a>
-
-      <a class="exec-entry-card" href="${ctx}/alarm?action=list&alarmLevel=高">
-        <div class="exec-entry-icon">🚨</div>
-        <div class="exec-entry-title">接收高等级告警推送</div>
-        <div class="exec-entry-desc">快速查看高等级告警列表，辅助管理层决策。</div>
-        <div class="exec-entry-meta">跳转至告警运维</div>
       </a>
 
       <a class="exec-entry-card" href="${ctx}/app?module=energy&view=report_overview">
@@ -43,7 +36,7 @@
     </div>
 
     <div class="dashboard-callout" style="margin-top:22px;">
-      提示：目前已优先实现 <b>“大屏”</b> 功能，其余入口已完成跳转（可继续按需求细化页面）。
+      提示：高等级告警入口已从“工作台/侧边栏”移除，请在 <b>“大屏”</b> 右上角进入“高等级告警”列表。
     </div>
   </div>
 </div>
