@@ -30,11 +30,6 @@
       <div class="pv-stat-value"><c:out value="${modelAlerts[0].modelVersion}" default="--"/></div>
       <div class="pv-stat-trend">最新模型版本</div>
     </div>
-    <div class="pv-stat-card">
-      <div class="pv-stat-label">平均优化周期</div>
-      <div class="pv-stat-value">--</div>
-      <div class="pv-stat-trend">待补充数据</div>
-    </div>
   </div>
 
   <div class="pv-section" style="margin-top: var(--spacing-xl);">
@@ -74,7 +69,7 @@
             <td><c:out value="${alert.triggerTime}" default="-"/></td>
             <td><c:out value="${alert.remark}" default="-"/></td>
             <td><c:out value="${alert.modelVersion}" default="-"/></td>
-            <td><span class="pv-text-badge"><c:out value="${alert.processStatus}" default="-"/></span></td>
+            <td><span class="pv-text-badge <c:if test='${alert.processStatus == "待处理"}'>warn</c:if>"><c:out value="${alert.processStatus}" default="-"/></span></td>
           </tr>
         </c:forEach>
         <c:if test="${empty modelAlerts}">
