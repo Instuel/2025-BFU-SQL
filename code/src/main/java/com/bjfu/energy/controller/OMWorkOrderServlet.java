@@ -107,7 +107,7 @@ public class OMWorkOrderServlet extends HttpServlet {
         }
         
         // 获取运维人员ID
-        String omId = currentUser.getUserId();
+        String omId = String.valueOf(currentUser.getUserId());
         
         // 查询分配给当前运维人员的工单
         List<WorkOrder> workOrders = alarmService.listWorkOrdersByOM(omId, status, reviewStatus);
@@ -135,7 +135,7 @@ public class OMWorkOrderServlet extends HttpServlet {
         }
 
         // 获取关联的告警信息
-        AlarmInfo alarm = alarmService.findAlarmById(workOrder.getAlarmId());
+        AlarmInfo alarm = alarmService.getAlarm(workOrder.getAlarmId());
         
         req.setAttribute("workOrder", workOrder);
         req.setAttribute("alarm", alarm);
@@ -186,7 +186,7 @@ public class OMWorkOrderServlet extends HttpServlet {
             return;
         }
 
-        AlarmInfo alarm = alarmService.findAlarmById(alarmId);
+        AlarmInfo alarm = alarmService.getAlarm(Long.valueOf(alarmId));
         if (alarm == null) {
             resp.sendError(HttpServletResponse.SC_NOT_FOUND, "告警不存在");
             return;
@@ -194,7 +194,7 @@ public class OMWorkOrderServlet extends HttpServlet {
 
         // 查询关联的工单信息（仅查询分配给当前运维人员的工单）
         com.bjfu.energy.entity.SysUser currentUser = (com.bjfu.energy.entity.SysUser) req.getSession().getAttribute("currentUser");
-        String omId = currentUser != null ? currentUser.getUserId() : null;
+        String omId = currentUser != null ? String.valueOf(currentUser.getUserId()) : null;
         WorkOrder workOrder = alarmService.findWorkOrderByAlarmIdAndOM(alarmId, omId);
         
         req.setAttribute("alarm", alarm);

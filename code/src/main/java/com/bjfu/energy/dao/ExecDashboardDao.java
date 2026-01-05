@@ -71,6 +71,15 @@ public class ExecDashboardDao {
         return overview;
     }
 
+    /**
+     * 获取实时汇总数据 - 提供当前系统的关键指标概览
+     * 这个方法提供与 getMonthlyOverview() 类似的功能，但专注于实时数据
+     */
+    public Map<String, Object> getRealtimeSummary() throws Exception {
+        // 复用 getMonthlyOverview 的逻辑，因为它已经提供了实时的月度汇总
+        return getMonthlyOverview();
+    }
+
     public List<Map<String, Object>> listHighAlarms(int limit) throws Exception {
         String sql = "SELECT TOP " + limit + " a.Alarm_ID AS alarmId, a.Content AS content, " +
                      "CONVERT(VARCHAR(16), a.Occur_Time, 120) AS occurTime, " +

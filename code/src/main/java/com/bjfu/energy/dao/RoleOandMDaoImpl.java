@@ -28,18 +28,18 @@ public class RoleOandMDaoImpl implements RoleOandMDao {
     private SysUser mapUserRow(ResultSet rs) throws Exception {
         SysUser user = new SysUser();
         user.setUserId(rs.getLong("User_ID"));
-        user.setUsername(rs.getString("Username"));
-        user.setPassword(rs.getString("Password"));
+        user.setLoginAccount(rs.getString("Login_Account"));
+        user.setLoginPassword(rs.getString("Login_Password"));
         user.setRealName(rs.getString("Real_Name"));
-        user.setPhone(rs.getString("Phone"));
-        user.setEmail(rs.getString("Email"));
-        user.setRole(rs.getString("Role"));
+        user.setContactPhone(rs.getString("Contact_Phone"));
+        user.setDepartment(rs.getString("Department"));
+        user.setAccountStatus(rs.getInt("Account_Status"));
         return user;
     }
 
     @Override
     public List<SysUser> findAll() throws Exception {
-        String sql = "SELECT u.User_ID, u.Username, u.Password, u.Real_Name, u.Phone, u.Email, u.Role " +
+        String sql = "SELECT u.User_ID, u.Login_Account, u.Login_Password, u.Real_Name, u.Contact_Phone, u.Department, u.Account_Status " +
                      "FROM Sys_User u " +
                      "INNER JOIN Role_OandM r ON u.User_ID = r.User_ID " +
                      "ORDER BY u.User_ID";
@@ -56,7 +56,7 @@ public class RoleOandMDaoImpl implements RoleOandMDao {
 
     @Override
     public List<SysUser> findByFactory(Long factoryId) throws Exception {
-        String sql = "SELECT u.User_ID, u.Username, u.Password, u.Real_Name, u.Phone, u.Email, u.Role " +
+        String sql = "SELECT u.User_ID, u.Login_Account, u.Login_Password, u.Real_Name, u.Contact_Phone, u.Department, u.Account_Status " +
                      "FROM Sys_User u " +
                      "INNER JOIN Role_OandM r ON u.User_ID = r.User_ID " +
                      "WHERE r.Factory_ID = ? " +
