@@ -61,7 +61,9 @@ public class DispatcherDaoImpl implements DispatcherDao {
 
     @Override
     public List<SysUser> findOandMUsers() throws Exception {
-        String sql = "SELECT u.User_ID, u.Login_Account, u.Real_Name, u.Department, u.Contact_Phone " +
+        // 注意：Work_Order.OandM_ID 存的是 Role_OandM.OandM_ID（不是 Sys_User.User_ID）。
+        // 这里把 OandM_ID 也查出来，供派单页面作为 select 的 value。
+        String sql = "SELECT u.User_ID, r.OandM_ID, u.Login_Account, u.Real_Name, u.Department, u.Contact_Phone " +
                      "FROM Sys_User u " +
                      "INNER JOIN Role_OandM r ON u.User_ID = r.User_ID " +
                      "WHERE u.Account_Status = 1 " +
@@ -74,6 +76,8 @@ public class DispatcherDaoImpl implements DispatcherDao {
             while (rs.next()) {
                 SysUser user = new SysUser();
                 user.setUserId(rs.getLong("User_ID"));
+                long oandmId = rs.getLong("OandM_ID");
+                user.setOandmId(rs.wasNull() ? null : oandmId);
                 user.setLoginAccount(rs.getString("Login_Account"));
                 user.setRealName(rs.getString("Real_Name"));
                 user.setDepartment(rs.getString("Department"));

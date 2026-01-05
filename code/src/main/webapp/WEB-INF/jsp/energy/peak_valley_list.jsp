@@ -10,6 +10,8 @@
       <p>按电网峰谷时段自动统计每日能耗及成本，定位高耗能区域。</p>
     </div>
 
+    <a class="back-btn" href="${ctx}/app?module=energy&view=meter_list" style="display:inline-block;margin-bottom:16px;color:#0ea5e9;text-decoration:none;font-size:14px;">← 返回综合能耗首页</a>
+
     <div class="energy-filter-section">
       <form class="energy-filter-bar" method="get" action="${ctx}/app">
         <input type="hidden" name="module" value="energy"/>
@@ -63,7 +65,7 @@
         <h3 class="section-title">峰谷统计明细</h3>
         <div class="action-buttons">
           <button class="action-btn secondary">生成日报</button>
-          <button class="action-btn">导出 Excel</button>
+          <a class="action-btn" href="${ctx}/exportCSV?type=peak_valley&factoryId=${selectedFactoryId}&energyType=${selectedEnergyType}">导出CSV</a>
         </div>
       </div>
       <div class="table-container">

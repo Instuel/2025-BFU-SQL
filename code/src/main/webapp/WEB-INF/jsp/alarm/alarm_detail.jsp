@@ -15,7 +15,9 @@
 
   <div class="alarm-nav">
     <a class="action-btn primary" href="${ctx}/alarm?action=list&module=alarm">告警列表</a>
-    <a class="action-btn" href="${ctx}/alarm?action=workorderList&module=alarm">运维工单</a>
+    <c:if test="${sessionScope.currentRoleType == 'OM' || sessionScope.currentRoleType == '运维人员'}">
+      <a class="action-btn" href="${ctx}/alarm?action=workorderList&module=alarm">运维工单</a>
+    </c:if>
     <a class="action-btn" href="${ctx}/alarm?action=ledgerList&module=alarm">设备台账</a>
     <a class="action-btn" href="${ctx}/alarm?action=maintenancePlanList&module=alarm">维护计划</a>
   </div>

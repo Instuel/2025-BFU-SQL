@@ -11,6 +11,8 @@
       <p>制定峰谷负荷优化策略，跟踪方案执行后的能耗下降效果。</p>
     </div>
 
+    <a class="back-btn" href="${ctx}/app?module=energy&view=meter_list" style="display:inline-block;margin-bottom:16px;color:#0ea5e9;text-decoration:none;font-size:14px;">← 返回综合能耗首页</a>
+
     <c:if test="${param.success == 'plan'}">
       <div class="message success-message">节能方案已新增并进入执行中。</div>
     </c:if>
@@ -156,11 +158,10 @@
             <option value="天然气">天然气</option>
           </select>
         </div>
-<<<<<<< HEAD
         <div class="energy-form-item">
           <label>方案标题</label>
           <input class="energy-date-input" type="text" name="planTitle" placeholder="如：峰谷用电时段调整" required/>
-                 placeholder="如：峰谷用电时段调整" required/>
+                 
         </div>
 
         <div class="energy-form-item">
@@ -169,7 +170,6 @@
                  placeholder="如：将高负荷生产移至 22:00 后" required/>
         </div>
 
->>>>>>> origin/main
         <div class="energy-form-item">
           <label>启动日期</label>
           <input class="energy-date-input" type="date" name="startDate" required/>
@@ -190,7 +190,10 @@
     <div class="section">
       <div class="section-header">
         <h3 class="section-title">方案执行清单</h3>
+        <div class="action-buttons">
+          <a class="action-btn" href="${ctx}/exportCSV?type=optimization_plan">导出CSV</a>
         </div>
+      </div>
       <div class="table-container">
         <table class="data-table">
           <thead>

@@ -69,7 +69,7 @@
       </thead>
       <tbody>
       <c:forEach items="${workOrders}" var="wo">
-        <tr class="<c:if test='${wo.reviewStatus == null || wo.reviewStatus == ""}'>highlight-row</c:if>" data-alarm-type="${wo.alarmType}">
+        <tr class="<c:if test='${(wo.finishTime != null) && (wo.reviewStatus == null || wo.reviewStatus == "")}'>highlight-row</c:if>" data-alarm-type="${wo.alarmType}">
           <td>${wo.orderId}</td>
           <td>${wo.alarmType}</td>
           <td>
@@ -93,13 +93,26 @@
               <c:when test="${wo.reviewStatus == '未通过'}">
                 <span class="order-review-tag fail">未通过</span>
               </c:when>
-              <c:otherwise>
+              <c:when test="${wo.finishTime != null}">
                 <span class="order-review-tag pending">待审核</span>
+              </c:when>
+              <c:when test="${wo.responseTime == null}">
+                <span class="order-review-tag pending">待响应</span>
+              </c:when>
+              <c:otherwise>
+                <span class="order-review-tag pending">处理中</span>
               </c:otherwise>
             </c:choose>
           </td>
           <td>
-            <a class="btn btn-link" href="${ctx}/dispatcher?action=reviewWorkOrder&id=${wo.orderId}">审核</a>
+            <c:choose>
+              <c:when test="${wo.finishTime != null && (wo.reviewStatus == null || wo.reviewStatus == '')}">
+                <a class="btn btn-link" href="${ctx}/dispatcher?action=reviewWorkOrder&id=${wo.orderId}">审核</a>
+              </c:when>
+              <c:otherwise>
+                <a class="btn btn-link" href="${ctx}/dispatcher?action=workOrderDetail&id=${wo.orderId}">查看</a>
+              </c:otherwise>
+            </c:choose>
           </td>
         </tr>
       </c:forEach>

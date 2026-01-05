@@ -1,6 +1,7 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
+<c:set var="act" value="${empty param.action ? requestScope.action : param.action}" />
 
 <div class="sidebar">
   <div style="padding:0 28px 14px 28px;">
@@ -10,12 +11,20 @@
 
   <ul class="sidebar-menu">
     <li>
-      <a class="active" href="${ctx}/dispatcher?action=list">
+      <a href="${ctx}/app?module=dashboard">
+        <span class="icon">⬅️</span> <span>返回大屏/总览</span>
+      </a>
+    </li>
+
+    <li>
+      <a class="<c:out value='${act=="list" ? "active" : ""}'/>"
+         href="${ctx}/dispatcher?action=list&module=dispatcher">
         <span class="icon">📋</span> <span>告警审核列表</span>
       </a>
     </li>
     <li>
-      <a href="${ctx}/dispatcher?action=workOrderList">
+      <a class="<c:out value='${act=="workOrderList" ? "active" : ""}'/>"
+         href="${ctx}/dispatcher?action=workOrderList&module=dispatcher">
         <span class="icon">🔍</span> <span>工单追踪</span>
       </a>
     </li>

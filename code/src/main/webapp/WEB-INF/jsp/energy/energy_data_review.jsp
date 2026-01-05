@@ -10,6 +10,8 @@
       <p>聚焦数据质量为“中/差”的能耗记录，完成复核并记录异常原因。</p>
     </div>
 
+    <a class="back-btn" href="${ctx}/app?module=energy&view=meter_list" style="display:inline-block;margin-bottom:16px;color:#0ea5e9;text-decoration:none;font-size:14px;">← 返回综合能耗首页</a>
+
     <c:if test="${param.success == 'review'}">
       <div class="message success-message">复核记录已更新。</div>
     </c:if>
@@ -75,7 +77,7 @@
       <div class="section-header">
         <h3 class="section-title">能耗数据复核清单</h3>
         <div class="action-buttons">
-          <button class="action-btn secondary">批量导出</button>
+          <a class="action-btn secondary" href="${ctx}/exportCSV?type=data_review&factoryId=${selectedFactoryId}&energyType=${selectedEnergyType}&quality=${selectedQuality}">导出CSV</a>
         </div>
       </div>
       <div class="table-container">

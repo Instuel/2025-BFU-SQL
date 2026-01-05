@@ -197,11 +197,15 @@ public class DispatcherServlet extends HttpServlet {
         int failedCount = 0;
 
         for (WorkOrder order : workOrders) {
-            if (order.getReviewStatus() == null || order.getReviewStatus().trim().isEmpty()) {
+            String rs = order.getReviewStatus();
+            boolean emptyReview = (rs == null || rs.trim().isEmpty());
+
+            // 仅当运维已完成并提交（Finish_Time 不为空）且 Review_Status 为空时，才算“待审核”。
+            if (emptyReview && order.getFinishTime() != null) {
                 pendingReviewCount++;
-            } else if ("通过".equals(order.getReviewStatus())) {
+            } else if ("通过".equals(rs)) {
                 passedCount++;
-            } else if ("未通过".equals(order.getReviewStatus())) {
+            } else if ("未通过".equals(rs)) {
                 failedCount++;
             }
         }

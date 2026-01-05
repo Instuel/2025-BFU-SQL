@@ -136,6 +136,59 @@ public class EnergyDao {
         return null;
     }
 
+    /**
+     * 新增计量设备
+     * @param energyType 能源类型（电/水/蒸汽/天然气）
+     * @param commProtocol 通讯协议
+     * @param runStatus 运行状态
+     * @param installLocation 安装位置
+     * @param calibCycleMonths 校准周期（月）
+     * @param manufacturer 生产厂家
+     * @param factoryId 厂区ID
+     * @param ledgerId 台账ID（可选）
+     */
+    public void createMeter(String energyType, String commProtocol, String runStatus,
+                            String installLocation, Integer calibCycleMonths, String manufacturer,
+                            Long factoryId, Long ledgerId) throws Exception {
+        String sql = "INSERT INTO Energy_Meter (Energy_Type, Comm_Protocol, Run_Status, " +
+                     "Install_Location, Calib_Cycle_Months, Manufacturer, Factory_ID, Ledger_ID) " +
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, energyType);
+            ps.setString(2, commProtocol);
+            ps.setString(3, runStatus != null ? runStatus : "正常");
+            ps.setString(4, installLocation);
+            if (calibCycleMonths != null) {
+                ps.setInt(5, calibCycleMonths);
+            } else {
+                ps.setNull(5, java.sql.Types.INTEGER);
+            }
+            ps.setString(6, manufacturer);
+            ps.setLong(7, factoryId);
+            if (ledgerId != null) {
+                ps.setLong(8, ledgerId);
+            } else {
+                ps.setNull(8, java.sql.Types.BIGINT);
+            }
+            ps.executeUpdate();
+        }
+    }
+
+    /**
+     * 新增计量设备（简化版，用于AppRouterServlet）
+     * @param energyType 能源类型（电/水/蒸汽/天然气）
+     * @param factoryId 厂区ID
+     * @param installLocation 安装位置
+     * @param commProtocol 通讯协议
+     * @param calibCycleMonths 校准周期（月）
+     * @param manufacturer 生产厂家
+     */
+    public void createMeter(String energyType, Long factoryId, String installLocation, 
+                            String commProtocol, Integer calibCycleMonths, String manufacturer) throws Exception {
+        createMeter(energyType, commProtocol, "正常", installLocation, calibCycleMonths, manufacturer, factoryId, null);
+    }
+
     public List<Map<String, Object>> listEnergyData(Long meterId, Long factoryId) throws Exception {
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT d.Data_ID AS dataId, d.Meter_ID AS meterId, ")

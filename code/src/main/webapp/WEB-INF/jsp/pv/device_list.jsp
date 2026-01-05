@@ -41,12 +41,6 @@
     </div>
   </div>
 
-  <c:if test="${not empty successMsg}">
-    <div class="pv-alert pv-alert-success" style="margin: var(--spacing-md) 0; padding: var(--spacing-md); background: #f6ffed; border: 1px solid #b7eb8f; border-radius: var(--radius-md); color: #52c41a;">
-      ${successMsg}
-    </div>
-  </c:if>
-
   <div class="pv-device-container">
     <div class="pv-device-header">
       <h1>设备运行概览</h1>
@@ -69,7 +63,6 @@
           <option value="DESC" <c:if test="${selectedSortOrder == 'DESC' || empty selectedSortOrder}">selected</c:if>>降序</option>
         </select>
         <button type="submit" class="pv-sort-btn">排序</button>
-        <a href="${ctx}/app?module=pv&view=device_add" class="pv-sort-btn" style="text-decoration: none; margin-left: 8px;">+ 新增</a>
       </form>
     </div>
 
@@ -107,22 +100,6 @@
           </div>
           <div class="pv-device-card-footer">
             <a href="${ctx}/app?module=pv&view=device_detail&id=${device.deviceId}" class="pv-device-detail-btn">查看详情 →</a>
-            <div class="pv-device-actions" style="display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-sm);">
-              <a href="${ctx}/app?module=pv&view=device_edit&id=${device.deviceId}" 
-                 class="pv-btn-edit" style="padding: 4px 12px; background: #e6f7ff; color: #1890ff; border-radius: var(--radius-sm); text-decoration: none; font-size: 12px;">
-                编辑
-              </a>
-              <form method="post" action="${ctx}/app" style="display: inline;" 
-                    onsubmit="return confirm('确定要删除该设备吗？删除后相关发电数据也会被清除！');">
-                <input type="hidden" name="module" value="pv"/>
-                <input type="hidden" name="action" value="device_delete"/>
-                <input type="hidden" name="deviceId" value="${device.deviceId}"/>
-                <button type="submit" class="pv-btn-delete" 
-                        style="padding: 4px 12px; background: #fff1f0; color: #ff4d4f; border: none; border-radius: var(--radius-sm); cursor: pointer; font-size: 12px;">
-                  删除
-                </button>
-              </form>
-            </div>
           </div>
         </div>
       </c:forEach>

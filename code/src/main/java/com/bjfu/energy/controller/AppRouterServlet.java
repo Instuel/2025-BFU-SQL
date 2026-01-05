@@ -268,24 +268,6 @@ public class AppRouterServlet extends HttpServlet {
                             break;
                         }
 
-                        case "device_add": {
-                            // 新增设备页面
-                            req.setAttribute("gridPoints", pvDao.listGridPoints());
-                            jsp = "/WEB-INF/jsp/pv/device_form.jsp";
-                            break;
-                        }
-
-                        case "device_edit": {
-                            // 编辑设备页面
-                            Long editDeviceId = parseLong(req.getParameter("id"));
-                            if (editDeviceId != null) {
-                                req.setAttribute("device", pvDao.findDeviceForEdit(editDeviceId));
-                            }
-                            req.setAttribute("gridPoints", pvDao.listGridPoints());
-                            jsp = "/WEB-INF/jsp/pv/device_form.jsp";
-                            break;
-                        }
-
                         case "device_list":
                         default: {
                             String sortBy = req.getParameter("sortBy");
@@ -294,16 +276,6 @@ public class AppRouterServlet extends HttpServlet {
                             req.setAttribute("devices", pvDao.listDevices(sortBy, sortOrder));
                             req.setAttribute("selectedSortBy", sortBy);
                             req.setAttribute("selectedSortOrder", sortOrder);
-                            req.setAttribute("gridPoints", pvDao.listGridPoints());
-                            // 处理操作结果消息
-                            String success = req.getParameter("success");
-                            if ("add".equals(success)) {
-                                req.setAttribute("successMsg", "设备添加成功！");
-                            } else if ("edit".equals(success)) {
-                                req.setAttribute("successMsg", "设备更新成功！");
-                            } else if ("delete".equals(success)) {
-                                req.setAttribute("successMsg", "设备删除成功！");
-                            }
                             jsp = "/WEB-INF/jsp/pv/device_list.jsp";
                             break;
                         }
@@ -511,38 +483,10 @@ public class AppRouterServlet extends HttpServlet {
         }
 
         // 非 energy 的 POST，直接交给 doGet 继续处理
-        if (!"energy".equals(module) && !"pv".equals(module)) {
+        if (!"energy".equals(module)) {
             doGet(req, resp);
             return;
         }
-
-        // 处理光伏设备的增删改操作
-        if ("pv".equals(module)) {
-            String action = req.getParameter("action");
-            if (action == null || action.trim().isEmpty()) {
-                doGet(req, resp);
-                return;
-            }
-            try {
-                switch (action) {
-                    case "device_add":
-                        handleDeviceAdd(req, resp);
-                        return;
-                    case "device_edit":
-                        handleDeviceEdit(req, resp);
-                        return;
-                    case "device_delete":
-                        handleDeviceDelete(req, resp);
-                        return;
-                    default:
-                        doGet(req, resp);
-                }
-            } catch (Exception e) {
-                throw new ServletException("光伏设备操作失败: " + e.getMessage(), e);
-            }
-            return;
-        }
-
         String action = req.getParameter("action");
         if (action == null || action.trim().isEmpty()) {
             doGet(req, resp);
@@ -558,6 +502,9 @@ public class AppRouterServlet extends HttpServlet {
                     return;
                 case "create_investigation":
                     handleCreateInvestigation(req, resp);
+                    return;
+                case "create_meter":
+                    handleCreateMeter(req, resp);
                     return;
                 default:
                     doGet(req, resp);
@@ -695,6 +642,45 @@ public class AppRouterServlet extends HttpServlet {
         resp.sendRedirect(req.getContextPath() + "/app?module=energy&view=investigation_list&success=investigation");
     }
 
+    private void handleCreateMeter(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+        String energyType = req.getParameter("energyType");
+        Long factoryId = parseLong(req.getParameter("factoryId"));
+        String installLocation = req.getParameter("installLocation");
+        String commProtocol = req.getParameter("commProtocol");
+        String calibCycleMonthsStr = req.getParameter("calibCycleMonths");
+        String manufacturer = req.getParameter("manufacturer");
+
+        // 验证必填字段
+        if (energyType == null || energyType.trim().isEmpty()
+                || factoryId == null
+                || installLocation == null || installLocation.trim().isEmpty()) {
+            resp.sendRedirect(req.getContextPath() + "/app?module=energy&view=meter_list&error=missing");
+            return;
+        }
+
+        // 解析校准周期
+        Integer calibCycleMonths = null;
+        if (calibCycleMonthsStr != null && !calibCycleMonthsStr.trim().isEmpty()) {
+            try {
+                calibCycleMonths = Integer.parseInt(calibCycleMonthsStr.trim());
+            } catch (NumberFormatException e) {
+                // 忽略无效数值
+            }
+        }
+
+        // 调用DAO新增计量设备
+        energyDao.createMeter(
+            energyType.trim(),
+            factoryId,
+            installLocation.trim(),
+            commProtocol != null ? commProtocol.trim() : null,
+            calibCycleMonths,
+            manufacturer != null ? manufacturer.trim() : null
+        );
+
+        resp.sendRedirect(req.getContextPath() + "/app?module=energy&view=meter_list&success=meter");
+    }
+
     private void loadAnalystDashboard(HttpServletRequest req) throws ServletException {
         HttpSession session = req.getSession(false);
         String roleType = session == null ? null : (String) session.getAttribute("currentRoleType");
@@ -776,85 +762,5 @@ public class AppRouterServlet extends HttpServlet {
             items.add(fallback);
         }
         return items;
-    }
-
-    // ==================== 光伏设备增删改处理方法 ====================
-
-    /**
-     * 处理新增设备
-     */
-    private void handleDeviceAdd(HttpServletRequest req, HttpServletResponse resp) throws Exception {
-        String deviceType = req.getParameter("deviceType");
-        String capacityStr = req.getParameter("capacity");
-        String runStatus = req.getParameter("runStatus");
-        String installDate = req.getParameter("installDate");
-        String protocol = req.getParameter("protocol");
-        Long pointId = parseLong(req.getParameter("pointId"));
-
-        if (deviceType == null || deviceType.trim().isEmpty() || pointId == null) {
-            resp.sendRedirect(req.getContextPath() + "/app?module=pv&view=device_add&error=missing");
-            return;
-        }
-
-        Double capacity = null;
-        if (capacityStr != null && !capacityStr.trim().isEmpty()) {
-            capacity = Double.parseDouble(capacityStr.trim());
-        }
-
-        long newId = pvDao.insertDevice(deviceType.trim(), capacity, runStatus, installDate, protocol, pointId);
-        if (newId > 0) {
-            resp.sendRedirect(req.getContextPath() + "/app?module=pv&view=device_list&success=add");
-        } else {
-            resp.sendRedirect(req.getContextPath() + "/app?module=pv&view=device_add&error=failed");
-        }
-    }
-
-    /**
-     * 处理编辑设备
-     */
-    private void handleDeviceEdit(HttpServletRequest req, HttpServletResponse resp) throws Exception {
-        Long deviceId = parseLong(req.getParameter("deviceId"));
-        String deviceType = req.getParameter("deviceType");
-        String capacityStr = req.getParameter("capacity");
-        String runStatus = req.getParameter("runStatus");
-        String installDate = req.getParameter("installDate");
-        String protocol = req.getParameter("protocol");
-        Long pointId = parseLong(req.getParameter("pointId"));
-
-        if (deviceId == null || deviceType == null || deviceType.trim().isEmpty() || pointId == null) {
-            resp.sendRedirect(req.getContextPath() + "/app?module=pv&view=device_list&error=missing");
-            return;
-        }
-
-        Double capacity = null;
-        if (capacityStr != null && !capacityStr.trim().isEmpty()) {
-            capacity = Double.parseDouble(capacityStr.trim());
-        }
-
-        boolean success = pvDao.updateDevice(deviceId, deviceType.trim(), capacity, runStatus, installDate, protocol, pointId);
-        if (success) {
-            resp.sendRedirect(req.getContextPath() + "/app?module=pv&view=device_list&success=edit");
-        } else {
-            resp.sendRedirect(req.getContextPath() + "/app?module=pv&view=device_edit&id=" + deviceId + "&error=failed");
-        }
-    }
-
-    /**
-     * 处理删除设备
-     */
-    private void handleDeviceDelete(HttpServletRequest req, HttpServletResponse resp) throws Exception {
-        Long deviceId = parseLong(req.getParameter("deviceId"));
-
-        if (deviceId == null) {
-            resp.sendRedirect(req.getContextPath() + "/app?module=pv&view=device_list&error=missing");
-            return;
-        }
-
-        boolean success = pvDao.deleteDevice(deviceId);
-        if (success) {
-            resp.sendRedirect(req.getContextPath() + "/app?module=pv&view=device_list&success=delete");
-        } else {
-            resp.sendRedirect(req.getContextPath() + "/app?module=pv&view=device_list&error=delete_failed");
-        }
     }
 }

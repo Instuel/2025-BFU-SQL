@@ -137,6 +137,26 @@
     <url-pattern>/view/*</url-pattern>
   </servlet-mapping>
 
+  <!-- CSV导出 Servlet -->
+  <servlet>
+    <servlet-name>CSVExportServlet</servlet-name>
+    <servlet-class>com.bjfu.energy.controller.CSVExportServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>CSVExportServlet</servlet-name>
+    <url-pattern>/exportCSV</url-pattern>
+  </servlet-mapping>
+
+  <!-- 能源报告 Servlet：生成报告和导出PDF -->
+  <servlet>
+    <servlet-name>EnergyReportServlet</servlet-name>
+    <servlet-class>com.bjfu.energy.controller.EnergyReportServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>EnergyReportServlet</servlet-name>
+    <url-pattern>/energyReport</url-pattern>
+  </servlet-mapping>
+
   <welcome-file-list>
     <welcome-file>index.jsp</welcome-file>
   </welcome-file-list>

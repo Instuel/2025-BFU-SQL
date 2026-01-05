@@ -47,7 +47,7 @@
         <select name="oandmId" required>
           <option value="">请选择运维人员</option>
           <c:forEach items="${oandmUsers}" var="user">
-            <option value="${user.userId}">${user.realName} (${user.loginAccount})</option>
+            <option value="${user.oandmId}">${user.realName} (${user.loginAccount})</option>
           </c:forEach>
         </select>
       </div>

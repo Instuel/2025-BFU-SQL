@@ -21,7 +21,7 @@ import java.util.Set;
  *
  * 说明：
  * 你的前端样式依赖 /css 下的 common.css/components.css 等资源。
- * 如果这里不放行 /css，则浏览器请求 CSS 会被重定向到登录页，导致页面“像没样式”。
+ * 如果这里不放行 /css，则浏览器请求 CSS 会被重定向到登录页，导致页面"像没样式"。
  */
 public class AuthFilter implements Filter {
 
@@ -87,8 +87,6 @@ public class AuthFilter implements Filter {
             }
         }
 
-     // ...前面代码保持不变
-
         Set<String> permModules = (session == null) ? null : (Set<String>) session.getAttribute("currentPermModules");
         List<String> permUris = (session == null) ? null : (List<String>) session.getAttribute("currentPermUris");
 
@@ -97,9 +95,7 @@ public class AuthFilter implements Filter {
         // ---------------------------
         // 说明：你的系统入口有两种：
         // 1) /app?module=xxx（工作台路由）
-        // 2) /dist、/alarm、/admin、/dispatcher（业务线 Servlet）
-        // 之前仅对 /app 做了 module 权限校验，导致访问 /dist、/alarm 直接走 uriPattern 校验，
-        // 但数据库里这些模块没有配置 Uri_Pattern，于是管理员也会 403。
+        // 2) /dist、/alarm、/admin、/dispatcher、/energyReport（业务线 Servlet）
         String module = null;
         if (uri.startsWith(ctx + "/app")) {
             module = request.getParameter("module");
@@ -116,8 +112,23 @@ public class AuthFilter implements Filter {
             module = "admin";
         } else if (uri.startsWith(ctx + "/dispatcher")) {
             module = "dispatcher";
+        } else if (uri.startsWith(ctx + "/exportCSV")) {
+            // CSV导出功能：允许所有已登录用户访问
+            // 如需更严格的权限控制，可在此处添加角色或权限码检查
+            chain.doFilter(req, resp);
+            return;
+        } else if (uri.startsWith(ctx + "/energyReport")) {
+            // 能源报告功能：归属于energy模块
+            // 检查用户是否有energy模块权限
+            if (permModules == null || !permModules.contains("energy")) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                return;
+            }
+            chain.doFilter(req, resp);
+            return;
         }
 
+        // 模块权限检查
         if (module != null) {
             if (permModules == null || !permModules.contains(module)) {
                 response.sendError(HttpServletResponse.SC_FORBIDDEN);
@@ -134,7 +145,6 @@ public class AuthFilter implements Filter {
         }
 
         chain.doFilter(req, resp);
-
     }
 
     private boolean isUriPermitted(String uri, String ctx, List<String> permUris) {

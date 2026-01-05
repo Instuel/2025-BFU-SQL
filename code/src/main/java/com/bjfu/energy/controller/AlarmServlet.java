@@ -109,6 +109,9 @@ public class AlarmServlet extends HttpServlet {
                 case "submitWorkOrder":
                     handleSubmitWorkOrder(req, resp);
                     break;
+                case "receiveWorkOrder":
+                    handleReceiveWorkOrder(req, resp);
+                    break;
                 case "createMaintenancePlan":
                     handleCreateMaintenancePlan(req, resp);
                     break;
@@ -408,16 +411,40 @@ public class AlarmServlet extends HttpServlet {
 
     private void handleUpdateWorkOrder(HttpServletRequest req, HttpServletResponse resp)
             throws Exception, IOException {
+        Long orderId = Long.valueOf(req.getParameter("orderId"));
+        WorkOrder existing = alarmService.getWorkOrder(orderId);
+
         WorkOrder order = new WorkOrder();
-        order.setOrderId(Long.valueOf(req.getParameter("orderId")));
-        order.setAlarmId(parseLong(req.getParameter("alarmId")));
-        order.setLedgerId(parseLong(req.getParameter("ledgerId")));
-        order.setOandmId(parseLong(req.getParameter("oandmId")));
-        order.setDispatchTime(parseDateTime(req.getParameter("dispatchTime")));
+        order.setOrderId(orderId);
+        // 以数据库中的值为准，避免前端篡改关键字段
+        if (existing != null) {
+            order.setAlarmId(existing.getAlarmId());
+            order.setLedgerId(existing.getLedgerId());
+            order.setOandmId(existing.getOandmId());
+            order.setDispatchTime(existing.getDispatchTime());
+        } else {
+            order.setAlarmId(parseLong(req.getParameter("alarmId")));
+            order.setLedgerId(parseLong(req.getParameter("ledgerId")));
+            order.setOandmId(parseLong(req.getParameter("oandmId")));
+            order.setDispatchTime(parseDateTime(req.getParameter("dispatchTime")));
+        }
         order.setResponseTime(parseDateTime(req.getParameter("responseTime")));
         order.setFinishTime(parseDateTime(req.getParameter("finishTime")));
         order.setResultDesc(req.getParameter("resultDesc"));
-        order.setReviewStatus(req.getParameter("reviewStatus"));
+        String currentRoleType = (String) req.getSession().getAttribute("currentRoleType");
+
+        // 运维人员更新工单时，不允许篡改复查状态；同时保留原审核反馈。
+        if (existing != null) {
+            order.setReviewFeedback(existing.getReviewFeedback());
+            if ("OM".equals(currentRoleType)) {
+                order.setReviewStatus(existing.getReviewStatus());
+            } else {
+                order.setReviewStatus(req.getParameter("reviewStatus"));
+            }
+        } else {
+            order.setReviewStatus(req.getParameter("reviewStatus"));
+        }
+
         String attachmentPath = handleAttachmentUpload(req, req.getParameter("attachmentPath"));
         order.setAttachmentPath(attachmentPath);
 
@@ -428,22 +455,76 @@ public class AlarmServlet extends HttpServlet {
 
     private void handleSubmitWorkOrder(HttpServletRequest req, HttpServletResponse resp)
             throws Exception, IOException {
+        Long orderId = Long.valueOf(req.getParameter("orderId"));
+        WorkOrder existing = alarmService.getWorkOrder(orderId);
+
         WorkOrder order = new WorkOrder();
-        order.setOrderId(Long.valueOf(req.getParameter("orderId")));
-        order.setAlarmId(parseLong(req.getParameter("alarmId")));
-        order.setLedgerId(parseLong(req.getParameter("ledgerId")));
-        order.setOandmId(parseLong(req.getParameter("oandmId")));
-        order.setDispatchTime(parseDateTime(req.getParameter("dispatchTime")));
-        order.setResponseTime(parseDateTime(req.getParameter("responseTime")));
-        order.setFinishTime(parseDateTime(req.getParameter("finishTime")));
+        order.setOrderId(orderId);
+        // 关键字段以数据库为准，避免前端篡改
+        if (existing != null) {
+            order.setAlarmId(existing.getAlarmId());
+            order.setLedgerId(existing.getLedgerId());
+            order.setOandmId(existing.getOandmId());
+            order.setDispatchTime(existing.getDispatchTime());
+        } else {
+            order.setAlarmId(parseLong(req.getParameter("alarmId")));
+            order.setLedgerId(parseLong(req.getParameter("ledgerId")));
+            order.setOandmId(parseLong(req.getParameter("oandmId")));
+            order.setDispatchTime(parseDateTime(req.getParameter("dispatchTime")));
+        }
+        LocalDateTime responseTime = parseDateTime(req.getParameter("responseTime"));
+        LocalDateTime finishTime = parseDateTime(req.getParameter("finishTime"));
+
+        // 提交=确认已收到并处理完成：若未填写时间，则自动补当前时间
+        if (responseTime == null) {
+            responseTime = LocalDateTime.now();
+        }
+        if (finishTime == null) {
+            finishTime = LocalDateTime.now();
+        }
+        order.setResponseTime(responseTime);
+        order.setFinishTime(finishTime);
         order.setResultDesc(req.getParameter("resultDesc"));
         order.setReviewStatus(null);
-        String attachmentPath = handleAttachmentUpload(req, null);
+        // 提交时如未重新上传附件，保留原附件
+        String attachmentPath = handleAttachmentUpload(req, existing == null ? null : existing.getAttachmentPath());
         order.setAttachmentPath(attachmentPath);
+
+        // 提交后清空上一轮审核反馈（若有）
+        order.setReviewFeedback(null);
 
         alarmService.updateWorkOrder(order);
         String target = req.getContextPath() + "/alarm?action=workorderDetail&id=" + order.getOrderId() + "&module=alarm";
         resp.sendRedirect(buildRedirect(target, "工单已提交审核"));
+    }
+
+    /**
+     * 运维人员“收到工单”动作：补写 Response_Time。
+     */
+    private void handleReceiveWorkOrder(HttpServletRequest req, HttpServletResponse resp)
+            throws Exception, IOException {
+        String currentRoleType = (String) req.getSession().getAttribute("currentRoleType");
+        if (!"OM".equals(currentRoleType)) {
+            resp.sendError(HttpServletResponse.SC_FORBIDDEN, "仅运维人员可以执行收到工单操作");
+            return;
+        }
+
+        Long orderId = Long.valueOf(req.getParameter("orderId"));
+        WorkOrder existing = alarmService.getWorkOrder(orderId);
+        if (existing == null) {
+            String target = req.getContextPath() + "/alarm?action=workorderList&module=alarm";
+            resp.sendRedirect(buildRedirect(target, "未找到对应工单"));
+            return;
+        }
+
+        // 只在未响应时写入响应时间
+        if (existing.getResponseTime() == null) {
+            existing.setResponseTime(LocalDateTime.now());
+            alarmService.updateWorkOrder(existing);
+        }
+
+        String target = req.getContextPath() + "/alarm?action=workorderDetail&id=" + orderId + "&module=alarm";
+        resp.sendRedirect(buildRedirect(target, "已标记为收到工单"));
     }
 
     private void handleCreateMaintenancePlan(HttpServletRequest req, HttpServletResponse resp)
@@ -504,7 +585,7 @@ public class AlarmServlet extends HttpServlet {
             throws IOException, ServletException {
         Part part = req.getPart("attachmentFile");
         if (part == null || part.getSize() == 0) {
-            return null;
+            return fallbackPath;
         }
 
         long maxSize = 10 * 1024 * 1024;
@@ -527,7 +608,7 @@ public class AlarmServlet extends HttpServlet {
             }
         }
         if (!isValidExtension) {
-            return null;
+            return fallbackPath;
         }
 
         String safeName = Paths.get(submittedFileName).getFileName().toString();
@@ -541,7 +622,7 @@ public class AlarmServlet extends HttpServlet {
         try {
             Files.copy(part.getInputStream(), target);
         } catch (IOException ex) {
-            return null;
+            return fallbackPath;
         }
         return "/uploads/workorder/" + uniqueFileName;
     }

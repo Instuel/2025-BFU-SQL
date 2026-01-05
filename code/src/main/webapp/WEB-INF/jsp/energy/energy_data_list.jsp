@@ -11,6 +11,8 @@
       <p>分钟级采集数据，支持数据质量核查与厂区对比分析。</p>
     </div>
 
+    <a class="back-btn" href="${ctx}/app?module=energy&view=meter_list" style="display:inline-block;margin-bottom:16px;color:#0ea5e9;text-decoration:none;font-size:14px;">← 返回综合能耗首页</a>
+
     <div class="energy-filter-section">
       <form class="energy-filter-bar" method="get" action="${ctx}/app">
         <input type="hidden" name="module" value="energy"/>
@@ -58,7 +60,7 @@
         <h3 class="section-title">能耗监测记录</h3>
         <div class="action-buttons">
           <button class="action-btn secondary">批量标记待核实</button>
-          <button class="action-btn">导出数据</button>
+          <a class="action-btn" href="${ctx}/exportCSV?type=energy_data&factoryId=${selectedFactoryId}">导出CSV</a>
         </div>
       </div>
       <div class="table-container">

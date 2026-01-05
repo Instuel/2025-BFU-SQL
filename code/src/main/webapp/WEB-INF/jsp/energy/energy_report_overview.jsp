@@ -10,6 +10,8 @@
       <p>按月汇总不同厂区与能源类型能耗数据，并对比峰谷差值。</p>
     </div>
 
+    <a class="back-btn" href="${ctx}/app?module=energy&view=meter_list" style="display:inline-block;margin-bottom:16px;color:#0ea5e9;text-decoration:none;font-size:14px;">← 返回综合能耗首页</a>
+
     <div class="energy-filter-section">
       <form class="energy-filter-bar" method="get" action="${ctx}/app">
         <input type="hidden" name="module" value="energy"/>
@@ -65,7 +67,7 @@
         <h3 class="section-title">月度能耗报表</h3>
         <div class="action-buttons">
           <button class="action-btn secondary">生成月报</button>
-          <button class="action-btn">导出 Excel</button>
+          <a class="action-btn" href="${ctx}/exportCSV?type=monthly_report&factoryId=${selectedFactoryId}&energyType=${selectedEnergyType}">导出CSV</a>
         </div>
       </div>
       <div class="table-container">

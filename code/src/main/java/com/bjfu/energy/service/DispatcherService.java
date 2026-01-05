@@ -150,6 +150,11 @@ public class DispatcherService {
         if (order == null) {
             throw new IllegalArgumentException("工单不存在");
         }
+
+        // 只有运维完成并提交（完成时间不为空）的工单才能审核
+        if (order.getFinishTime() == null) {
+            throw new IllegalStateException("工单尚未提交，不能审核");
+        }
         
         dispatcherDao.updateWorkOrderReview(orderId, reviewStatus.trim(), reviewFeedback);
         

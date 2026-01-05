@@ -117,7 +117,7 @@
       </div>
     </c:if>
 
-    <c:if test="${workOrder.reviewStatus == null || workOrder.reviewStatus == ''}">
+    <c:if test="${workOrder.finishTime != null && (workOrder.reviewStatus == null || workOrder.reviewStatus == '')}">
       <div class="rule-form" style="margin-top:24px;">
         <div class="rule-form-header">
           <h2>工单审核</h2>
@@ -154,6 +154,12 @@
             <a class="btn btn-secondary" href="${ctx}/dispatcher?action=workOrderList">取消</a>
           </div>
         </form>
+      </div>
+    </c:if>
+
+    <c:if test="${workOrder.finishTime == null}">
+      <div class="warning-message" style="margin-top:24px;">
+        该工单尚未由运维人员提交（完成时间为空），暂不能审核。
       </div>
     </c:if>
   </c:if>

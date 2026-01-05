@@ -9,13 +9,15 @@
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
     <div>
       <h2>运维工单详情</h2>
-      <p style="color:#64748b;margin-top:6px;">填写处理过程、上传附件并完成复查。</p>
+      <p style="color:#64748b;margin-top:6px;">收到工单后填写处理过程并提交审核。</p>
     </div>
   </div>
 
   <div class="alarm-nav">
     <a class="action-btn" href="${ctx}/alarm?action=list&module=alarm">告警列表</a>
-    <a class="action-btn primary" href="${ctx}/alarm?action=workorderList&module=alarm">运维工单</a>
+    <c:if test="${sessionScope.currentRoleType == 'OM' || sessionScope.currentRoleType == '运维人员'}">
+      <a class="action-btn primary" href="${ctx}/alarm?action=workorderList&module=alarm">运维工单</a>
+    </c:if>
     <a class="action-btn" href="${ctx}/alarm?action=ledgerList&module=alarm">设备台账</a>
     <a class="action-btn" href="${ctx}/alarm?action=maintenancePlanList&module=alarm">维护计划</a>
   </div>
@@ -25,6 +27,7 @@
   </c:if>
 
   <c:if test="${createMode}">
+    <div class="warning-message" style="margin-bottom:16px;">当前页面处于创建模式：建议由调度员在“告警审核/派单”流程中创建工单。</div>
     <div class="rule-form">
       <div class="rule-form-header">
         <h2>创建运维工单</h2>
@@ -47,32 +50,26 @@
       <form action="${ctx}/alarm" method="post" enctype="multipart/form-data" class="rule-form-grid">
         <input type="hidden" name="action" value="createWorkOrder"/>
         <input type="hidden" name="alarmId" value="${alarm.alarmId}"/>
+
         <div class="form-group">
-          <label>运维人员 ID</label>
-          <input name="oandmId" placeholder="填写运维人员 ID"/>
-        </div>
-        <div class="form-group">
-          <label>设备台账编号</label>
-          <input name="ledgerId" value="${alarm.ledgerId}" placeholder="关联设备台账编号"/>
+          <label class="form-label">运维人员 OandM_ID</label>
+          <input class="form-control" name="oandmId" placeholder="填写 Role_OandM.OandM_ID"/>
         </div>
         <div class="form-group">
-          <label>派单时间</label>
-          <input type="datetime-local" name="dispatchTime"/>
+          <label class="form-label">设备台账编号</label>
+          <input class="form-control" name="ledgerId" value="${alarm.ledgerId}"/>
         </div>
-        <div class="form-group">
-          <label>附件路径</label>
-          <input name="attachmentPath" placeholder="例如：/upload/workorder/2024-01-01.png"/>
+        <div class="form-group" style="grid-column:1/-1;">
+          <label class="form-label">派单说明</label>
+          <textarea class="form-control" name="resultDesc" rows="4" placeholder="可填写派单备注"></textarea>
         </div>
-        <div class="form-group">
-          <label>上传附件</label>
-          <input type="file" name="attachmentFile" accept=".png,.jpg,.jpeg,.pdf,.doc,.docx"/>
+        <div class="form-group" style="grid-column:1/-1;">
+          <label class="form-label">附件（可选）</label>
+          <input class="form-control" type="file" name="attachmentFile"/>
         </div>
-        <div class="form-group" style="grid-column:1 / -1;">
-          <label>派单说明</label>
-          <textarea name="resultDesc" rows="3" placeholder="补充派单说明"></textarea>
-        </div>
-        <div class="form-group" style="display:flex;align-items:flex-end;">
-          <button class="btn btn-primary" type="submit">创建工单</button>
+        <div class="form-actions" style="grid-column:1/-1;">
+          <button type="submit" class="btn btn-primary">创建工单</button>
+          <a class="btn btn-secondary" href="${ctx}/alarm?action=list&module=alarm">返回</a>
         </div>
       </form>
     </div>
@@ -82,152 +79,126 @@
     <c:if test="${workOrder == null}">
       <div class="warning-message">未找到对应工单。</div>
     </c:if>
-    
+
     <c:if test="${workOrder != null}">
       <div class="rule-form">
         <div class="rule-form-header">
           <h2>工单信息</h2>
-          <span class="order-priority <c:out value='${workOrder.alarmLevel == "高" ? "high" : (workOrder.alarmLevel == "中" ? "medium" : "low")}'/>">${workOrder.alarmLevel}级</span>
-        </div>
-        <form action="${ctx}/alarm" method="post" enctype="multipart/form-data" class="rule-form-grid">
-          <input type="hidden" name="action" value="updateWorkOrder"/>
-          <input type="hidden" name="orderId" value="${workOrder.orderId}"/>
-          <input type="hidden" name="alarmId" value="${workOrder.alarmId}"/>
-          <div class="form-group">
-            <label>工单编号</label>
-            <input value="${workOrder.orderId}" readonly/>
-          </div>
-          <div class="form-group">
-            <label>告警编号</label>
-            <input value="${workOrder.alarmId}" readonly/>
-          </div>
-          <div class="form-group">
-            <label>运维人员 ID</label>
-            <input name="oandmId" value="${workOrder.oandmId}" <c:if test="${isOM}">readonly</c:if>/>
-          </div>
-          <div class="form-group">
-            <label>设备台账编号</label>
-            <input name="ledgerId" value="${workOrder.ledgerId}" <c:if test="${isOM}">readonly</c:if>/>
-          </div>
-          <div class="form-group">
-            <label>派单时间</label>
-            <input type="datetime-local" name="dispatchTime" value="${workOrder.dispatchTime}" <c:if test="${isOM}">readonly</c:if>/>
-            <input name="oandmId" value="${workOrder.oandmId}"/>
-          </div>
-          <div class="form-group">
-            <label>设备台账编号</label>
-            <input name="ledgerId" value="${workOrder.ledgerId}"/>
-          </div>
-          <div class="form-group">
-            <label>派单时间</label>
-            <input type="datetime-local" name="dispatchTime" value="${workOrder.dispatchTime}"/>
-          </div>
-          <div class="form-group">
-            <label>响应时间</label>
-            <input type="datetime-local" name="responseTime" value="${workOrder.responseTime}"/>
-          </div>
-          <div class="form-group">
-            <label>完成时间</label>
-            <input type="datetime-local" name="finishTime" value="${workOrder.finishTime}"/>
-          </div>
-          <div class="form-group">
-            <label>响应提醒</label>
+          <div>
             <c:choose>
-              <c:when test="${workOrder.responseOverdue}">
-                <span class="order-reminder-tag overdue">超时提醒</span>
+              <c:when test="${workOrder.reviewStatus == '通过'}">
+                <span class="order-review-tag pass">通过</span>
+              </c:when>
+              <c:when test="${workOrder.reviewStatus == '未通过'}">
+                <span class="order-review-tag fail">未通过</span>
+              </c:when>
+              <c:when test="${workOrder.finishTime != null}">
+                <span class="order-review-tag pending">待审核</span>
+              </c:when>
+              <c:when test="${workOrder.responseTime == null}">
+                <span class="order-review-tag pending">待响应</span>
               </c:when>
               <c:otherwise>
-                <span class="order-reminder-tag">正常</span>
+                <span class="order-review-tag pending">处理中</span>
               </c:otherwise>
             </c:choose>
           </div>
+        </div>
+
+        <div class="table-container">
+          <table class="table">
+            <tbody>
+            <tr>
+              <th>工单编号</th>
+              <td>${workOrder.orderId}</td>
+              <th>告警编号</th>
+              <td>${workOrder.alarmId}</td>
+            </tr>
+            <tr>
+              <th>台账编号</th>
+              <td>${workOrder.ledgerId}</td>
+              <th>派单时间</th>
+              <td>${workOrder.dispatchTime}</td>
+            </tr>
+            <tr>
+              <th>响应时间</th>
+              <td>${workOrder.responseTime}</td>
+              <th>完成时间</th>
+              <td>${workOrder.finishTime}</td>
+            </tr>
+            <c:if test="${not empty workOrder.reviewFeedback}">
+              <tr>
+                <th>审核反馈</th>
+                <td colspan="3" style="color:#dc2626;">${workOrder.reviewFeedback}</td>
+              </tr>
+            </c:if>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <c:if test="${sessionScope.currentRoleType == 'OM'}">
+        <div style="margin-top:16px;">
+          <c:if test="${workOrder.responseTime == null}">
+            <form action="${ctx}/alarm" method="post" style="display:inline-block;margin-right:8px;">
+              <input type="hidden" name="action" value="receiveWorkOrder"/>
+              <input type="hidden" name="orderId" value="${workOrder.orderId}"/>
+              <button type="submit" class="btn btn-secondary">收到工单</button>
+            </form>
+          </c:if>
+        </div>
+      </c:if>
+
+      <div class="rule-form" style="margin-top:16px;">
+        <div class="rule-form-header">
+          <h2>填写处理信息</h2>
+        </div>
+
+        <form id="workOrderForm" action="${ctx}/alarm" method="post" enctype="multipart/form-data" class="rule-form-grid">
+          <input type="hidden" id="formAction" name="action" value="updateWorkOrder"/>
+          <input type="hidden" name="orderId" value="${workOrder.orderId}"/>
+          <input type="hidden" name="alarmId" value="${workOrder.alarmId}"/>
+          <input type="hidden" name="ledgerId" value="${workOrder.ledgerId}"/>
+          <input type="hidden" name="oandmId" value="${workOrder.oandmId}"/>
+          <input type="hidden" name="dispatchTime" value="${workOrder.dispatchTime}"/>
+          <input type="hidden" name="attachmentPath" value="${workOrder.attachmentPath}"/>
+
           <div class="form-group">
-            <label>复查状态</label>
-            <select name="reviewStatus" disabled>
-            <select name="reviewStatus">
-              <option value="" <c:if test="${empty workOrder.reviewStatus}">selected</c:if>>未复查</option>
-              <option value="通过" <c:if test="${workOrder.reviewStatus == '通过'}">selected</c:if>>通过</option>
-              <option value="未通过" <c:if test="${workOrder.reviewStatus == '未通过'}">selected</c:if>>未通过</option>
-            </select>
+            <label class="form-label">响应时间</label>
+            <input class="form-control" type="datetime-local" name="responseTime" value="${workOrder.responseTime}"/>
+            <div class="form-hint">点击“收到工单”会自动填写该时间，也可手动调整。</div>
           </div>
           <div class="form-group">
-            <label>附件路径</label>
-            <input name="attachmentPath" value="${workOrder.attachmentPath}"/>
+            <label class="form-label">完成时间</label>
+            <input class="form-control" type="datetime-local" name="finishTime" value="${workOrder.finishTime}"/>
+            <div class="form-hint">提交审核时若为空，系统会自动补当前时间。</div>
           </div>
-          <div class="form-group">
-            <label>上传附件</label>
-            <input type="file" name="attachmentFile" accept=".png,.jpg,.jpeg,.pdf,.doc,.docx"/>
+
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label">处理结果描述 <span class="required">*</span></label>
+            <textarea class="form-control" name="resultDesc" rows="6" placeholder="请填写处理过程、原因分析、处理措施等" required>${workOrder.resultDesc}</textarea>
+          </div>
+
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label">附件（可选）</label>
+            <input class="form-control" type="file" name="attachmentFile"/>
             <c:if test="${not empty workOrder.attachmentPath}">
-              <div style="margin-top:6px;font-size:12px;">
-                当前附件：
-                <a class="btn btn-link" href="${ctx}${workOrder.attachmentPath}" target="_blank">查看附件</a>
+              <div class="form-hint">
+                已有附件：<a href="${ctx}${workOrder.attachmentPath}" target="_blank">点击查看</a>
               </div>
             </c:if>
           </div>
-          <div class="form-group" style="grid-column:1 / -1;">
-            <label>处理结果</label>
-            <textarea name="resultDesc" rows="4">${workOrder.resultDesc}</textarea>
-          </div>
-          <div class="form-group" style="display:flex;align-items:flex-end;gap:12px;">
-            <button class="btn btn-primary" type="submit">保存工单</button>
-            <button class="btn btn-success" type="button" onclick="submitWorkOrder()">提交工单</button>
-          <div class="form-group" style="display:flex;align-items:flex-end;">
-            <button class="btn btn-primary" type="submit">保存工单</button>
+
+          <div class="form-actions" style="grid-column:1/-1;">
+            <c:if test="${sessionScope.currentRoleType == 'OM'}">
+              <button type="submit" class="btn btn-primary" onclick="document.getElementById('formAction').value='updateWorkOrder'">保存工单</button>
+              <button type="submit" class="btn btn-success" onclick="document.getElementById('formAction').value='submitWorkOrder'">提交审核</button>
+            </c:if>
+            <a class="btn btn-secondary" href="${ctx}/alarm?action=workorderList&module=alarm">返回列表</a>
           </div>
         </form>
       </div>
-
-      <script>
-        function submitWorkOrder() {
-          var form = document.querySelector('form');
-          var actionInput = form.querySelector('input[name="action"]');
-          actionInput.value = "submitWorkOrder";
-          form.submit();
-        }
-      </script>
-
-      <c:if test="${workOrder.reviewStatus == '未通过' && isDispatcher}">
-      <c:if test="${workOrder.reviewStatus == '未通过'}">
-        <div class="rule-form" style="margin-top:24px;">
-          <div class="rule-form-header">
-            <h2>复查未通过 - 重新派单</h2>
-          </div>
-          <form action="${ctx}/alarm" method="post" class="rule-form-grid">
-            <input type="hidden" name="action" value="redispatchWorkOrder"/>
-            <input type="hidden" name="orderId" value="${workOrder.orderId}"/>
-            <div class="form-group">
-              <label>重新指派运维人员 ID</label>
-              <input name="oandmId" value="${workOrder.oandmId}" placeholder="填写新的运维人员 ID"/>
-            </div>
-            <div class="form-group">
-              <label>重新派单时间</label>
-              <input type="datetime-local" name="dispatchTime"/>
-            </div>
-            <div class="form-group" style="grid-column:1 / -1;">
-              <label>重新派单原因</label>
-              <textarea name="redispatchReason" rows="3" placeholder="补充复查未通过的原因与新的处理要求"></textarea>
-            </div>
-            <div class="form-group" style="display:flex;align-items:flex-end;">
-              <button class="btn btn-primary" type="submit">确认重新派单</button>
-            </div>
-          </form>
-        </div>
-      </c:if>
-      
-      <!-- 运维人员看到的复查未通过信息（只读） -->
-      <c:if test="${workOrder.reviewStatus == '未通过' && isOM}">
-        <div class="rule-form" style="margin-top:24px;">
-          <div class="rule-form-header">
-            <h2>复查未通过</h2>
-          </div>
-          <div class="warning-message">
-            <strong>复查未通过：</strong>${workOrder.reviewFeedback}
-            <br><small>请根据反馈意见重新处理工单，完成后重新提交。工单重新派发由管理员负责。</small>
-          </div>
-        </div>
-      </c:if>
     </c:if>
-  </c:if>
   </c:if>
 </div>
 

@@ -12,6 +12,13 @@ import java.time.LocalDateTime;
 public class SysUser implements Serializable {
 
     private Long userId;
+
+    /**
+     * 运维人员角色表 Role_OandM 的主键（OandM_ID）。
+     *
+     * 说明：该字段不是 Sys_User 表字段，仅用于联查/页面选择（如派单选择运维人员）。
+     */
+    private Long oandmId;
     private String loginAccount;
     private String loginPassword; // SHA-256 hash hex
     private String salt;
@@ -31,6 +38,14 @@ public class SysUser implements Serializable {
 
     public void setUserId(Long userId) {
         this.userId = userId;
+    }
+
+    public Long getOandmId() {
+        return oandmId;
+    }
+
+    public void setOandmId(Long oandmId) {
+        this.oandmId = oandmId;
     }
 
     public String getLoginAccount() {
