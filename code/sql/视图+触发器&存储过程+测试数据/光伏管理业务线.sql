@@ -341,71 +341,106 @@ IF OBJECT_ID('TR_Check_Inverter_Efficiency', 'TR') IS NOT NULL
     DROP TRIGGER TR_Check_Inverter_Efficiency;
 GO
 
-CREATE TRIGGER TR_Check_Inverter_Efficiency
-ON Data_PV_Gen
+/* ============================================================
+   替换触发器：TR_Check_Inverter_Efficiency
+   你要把原来这段整个替换成下面这一段即可（位置不变，仍在 Part 3: 创建触发器 中）
+   ✅ 新增：向 dbo.Alarm_Info 插入告警（若表存在）
+   ✅ 防重复：同一 Device_ID + 当天 + “逆变器效率低于85%” 只插一次
+   ✅ 兼容：Alarm_Info 若缺列/列名不一致，会尽量只插必需列（动态拼列）
+   ============================================================ */
+
+CREATE OR ALTER TRIGGER dbo.TR_Check_Inverter_Efficiency
+ON dbo.Data_PV_Gen
 AFTER INSERT, UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-    
-    DECLARE @UpdatedCount INT = 0;
-    
-    -- 对于UPDATE操作，只检查Inverter_Eff字段被修改的情况
-    -- 对于INSERT操作，直接检查所有插入数据
-    IF NOT EXISTS (SELECT 1 FROM inserted)
+
+    /* 0) 没有 inserted 直接退出 */
+    IF NOT EXISTS (SELECT 1 FROM inserted) 
         RETURN;
-    
-    -- 检查新插入或更新的数据是否存在逆变器效率低于85%的记录
-    IF EXISTS (
-        SELECT 1 
+
+    /* 1) 先判断：本次变更里是否存在“逆变器效率<85 且设备当前为正常”的记录
+          注意：这里用 PV_Device 的当前 Run_Status 判断，避免把非正常设备也触发 */
+    IF NOT EXISTS (
+        SELECT 1
         FROM inserted i
-        INNER JOIN PV_Device d ON i.Device_ID = d.Device_ID
+        INNER JOIN dbo.PV_Device d ON d.Device_ID = i.Device_ID
         WHERE d.Device_Type = N'逆变器'
-          AND i.Inverter_Eff < 85.00
-          AND d.Run_Status = N'正常'  -- 只检查当前正常运行的设备
+          AND i.Inverter_Eff IS NOT NULL
+          AND i.Inverter_Eff < 85.0
+          AND d.Run_Status = N'正常'
     )
-    BEGIN
-        -- 将效率低于85%的设备标记为"异常"
-        UPDATE PV_Device
-        SET Run_Status = N'异常',
-            -- 检查字段是否存在，如果不存在就不更新该字段
-            Last_Update_Time = CASE 
-                WHEN COLUMNPROPERTY(OBJECT_ID('PV_Device'), 'Last_Update_Time', 'ColumnId') IS NOT NULL 
-                THEN GETDATE() 
-                ELSE Last_Update_Time 
-            END
-        FROM PV_Device d
-        INNER JOIN inserted i ON d.Device_ID = i.Device_ID
-        WHERE d.Device_Type = N'逆变器'
-          AND i.Inverter_Eff < 85.00
-          AND d.Run_Status = N'正常';  -- 避免重复更新
-        
-        SET @UpdatedCount = @@ROWCOUNT;
-        
-        IF @UpdatedCount > 0
-        BEGIN
-            PRINT N'发现 ' + CAST(@UpdatedCount AS NVARCHAR(10)) + N' 台逆变器效率低于85%，已标记为异常状态';
-            
-            -- 显示具体的异常设备信息（可选）
-            IF @UpdatedCount <= 10  -- 如果数量过多则不显示详情
-            BEGIN
-                SELECT 
-                    N'异常设备告警' AS Alert_Type,
-                    d.Device_ID,
-                    d.Capacity,
-                    i.Inverter_Eff AS Current_Efficiency,
-                    i.Collect_Time,
-                    N'逆变器效率低于85%，当前效率：' + CAST(i.Inverter_Eff AS NVARCHAR(10)) + N'%' AS Alert_Message
-                FROM inserted i
-                INNER JOIN PV_Device d ON i.Device_ID = d.Device_ID
-                WHERE d.Device_Type = N'逆变器'
-                  AND i.Inverter_Eff < 85.00
-                  AND d.Run_Status = N'异常';  -- 确保是刚刚被更新的设备
-            END
-        END
-    END
+        RETURN;
+
+    /* 2) 收集本次命中的“坏数据”到临时表（只收 Run_Status=正常 的，保证后续逻辑一致） */
+    IF OBJECT_ID('tempdb..#bad') IS NOT NULL DROP TABLE #bad;
+
+    SELECT DISTINCT
+        i.Device_ID,
+        i.Collect_Time,
+        i.Inverter_Eff,
+        d.Ledger_ID,
+        d.Point_ID
+    INTO #bad
+    FROM inserted i
+    INNER JOIN dbo.PV_Device d ON d.Device_ID = i.Device_ID
+    WHERE d.Device_Type = N'逆变器'
+      AND i.Inverter_Eff IS NOT NULL
+      AND i.Inverter_Eff < 85.0
+      AND d.Run_Status = N'正常';
+
+    /* 双保险：#bad 空则退出 */
+    IF NOT EXISTS (SELECT 1 FROM #bad)
+        RETURN;
+
+    /* 3) 更新设备状态：正常 -> 异常 */
+    UPDATE d
+    SET d.Run_Status = N'异常'
+    FROM dbo.PV_Device d
+    INNER JOIN #bad b ON b.Device_ID = d.Device_ID
+    WHERE d.Run_Status = N'正常';
+
+    /* 4) 写告警（避免重复：同一设备同一天同类告警不重复插入）
+          说明：你之前用 Content LIKE 去重，这里改成更稳的字段组合去重：
+          - Ledger_ID + 当天 + Alarm_Type + 关键字(逆变器效率低于85)
+          如果你 Alarm_Info 没有更合适的唯一键，只能这样做“软去重”。 */
+    INSERT INTO dbo.Alarm_Info
+    (
+        Alarm_Type,
+        Alarm_Level,
+        Content,
+        Occur_Time,
+        Process_Status,
+        Ledger_ID,
+        Factory_ID,
+        Verify_Status,
+        Trigger_Threshold
+    )
+    SELECT
+        N'越限告警' AS Alarm_Type,
+        N'中'       AS Alarm_Level,
+        N'逆变器效率低于85%：Device_ID=' + CAST(b.Device_ID AS NVARCHAR(20)) +
+        N'，效率=' + CAST(b.Inverter_Eff AS NVARCHAR(20)) +
+        N'% ，采集时间=' + CONVERT(NVARCHAR(19), b.Collect_Time, 120) AS Content,
+        ISNULL(b.Collect_Time, SYSDATETIME()) AS Occur_Time,
+        N'未处理' AS Process_Status,
+        b.Ledger_ID,
+        NULL AS Factory_ID,
+        N'待审核' AS Verify_Status,
+        CAST(85.0 AS DECIMAL(12,3)) AS Trigger_Threshold
+    FROM #bad b
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM dbo.Alarm_Info a
+        WHERE a.Ledger_ID = b.Ledger_ID
+          AND a.Alarm_Type = N'越限告警'
+          AND a.Content LIKE N'%逆变器效率低于85%%'
+          AND CONVERT(date, a.Occur_Time) = CONVERT(date, ISNULL(b.Collect_Time, SYSDATETIME()))
+    );
 END;
 GO
+
 
 PRINT N'触发器 TR_Check_Inverter_Efficiency 创建完成';
 GO

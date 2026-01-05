@@ -550,62 +550,81 @@ BEGIN TRY
        6) 触发器 1：实时总用电量环比上升 > 15% => 写入 Alarm_Info（若表存在）
        ------------------------------------------------------------ */
 
-    IF OBJECT_ID('dbo.Alarm_Info','U') IS NOT NULL
-    BEGIN
-        IF OBJECT_ID('dbo.TRG_StatRealtime_ConsumptionSpike','TR') IS NOT NULL
-            EXEC(N'DROP TRIGGER dbo.TRG_StatRealtime_ConsumptionSpike;');
+IF OBJECT_ID('dbo.Alarm_Info','U') IS NOT NULL
+BEGIN
+    IF OBJECT_ID('dbo.TRG_StatRealtime_ConsumptionSpike','TR') IS NOT NULL
+        EXEC(N'DROP TRIGGER dbo.TRG_StatRealtime_ConsumptionSpike;');
 
-        EXEC(N'
-            CREATE TRIGGER dbo.TRG_StatRealtime_ConsumptionSpike
-            ON dbo.Stat_Realtime
-            AFTER INSERT
-            AS
-            BEGIN
-                SET NOCOUNT ON;
+    EXEC(N'
+        CREATE TRIGGER dbo.TRG_StatRealtime_ConsumptionSpike
+        ON dbo.Stat_Realtime
+        AFTER INSERT
+        AS
+        BEGIN
+            SET NOCOUNT ON;
 
-                ;WITH ins AS (
-                    SELECT i.Summary_ID, i.Stat_Time, i.Total_KWH, i.Config_ID
-                    FROM inserted i
-                    WHERE i.Total_KWH IS NOT NULL
-                ),
-                prev AS (
-                    SELECT
-                        ins.Summary_ID,
-                        ins.Stat_Time,
-                        ins.Total_KWH AS Cur_KWH,
-                        p.Total_KWH  AS Prev_KWH
-                    FROM ins
-                    OUTER APPLY (
-                        SELECT TOP 1 r.Total_KWH
-                        FROM dbo.Stat_Realtime r
-                        WHERE r.Config_ID = ins.Config_ID
-                          AND r.Stat_Time < ins.Stat_Time
-                          AND r.Total_KWH IS NOT NULL
-                        ORDER BY r.Stat_Time DESC
-                    ) p
-                ),
-                spike AS (
-                    SELECT *,
-                           CASE WHEN Prev_KWH IS NULL OR Prev_KWH = 0 THEN NULL
-                                ELSE (Cur_KWH - Prev_KWH) / Prev_KWH
-                           END AS RiseRate
-                    FROM prev
-                )
-                INSERT INTO dbo.Alarm_Info (Alarm_Type, Alarm_Level, Content, Occur_Time, Process_Status, Ledger_ID, Factory_ID)
+            ;WITH ins AS (
                 SELECT
-                    N''能耗异常'',
-                    CASE WHEN RiseRate > 0.30 THEN N''高'' ELSE N''中'' END,
-                    CONCAT(N''总用电量突增：'', CONVERT(NVARCHAR(30), Cur_KWH), N'' kWh，较上一周期上升 '',
-                           CONVERT(NVARCHAR(10), CAST(RiseRate*100 AS DECIMAL(5,2))), N''%（Summary_ID='', Summary_ID, N''）''),
-                    SYSUTCDATETIME(),
-                    N''未处理'',
-                    NULL,
-                    NULL
-                FROM spike
-                WHERE RiseRate IS NOT NULL AND RiseRate > 0.15;
-            END
-        ');
-    END;
+                    i.Summary_ID,
+                    i.Stat_Time,
+                    i.Total_KWH,
+                    i.Config_ID
+                FROM inserted i
+                WHERE i.Total_KWH IS NOT NULL
+                  AND i.Stat_Time IS NOT NULL
+            ),
+            prev AS (
+                SELECT
+                    ins.Summary_ID,
+                    ins.Stat_Time,
+                    ins.Total_KWH AS Cur_KWH,
+                    p.Prev_KWH
+                FROM ins
+                OUTER APPLY (
+                    SELECT TOP 1 r.Total_KWH AS Prev_KWH
+                    FROM dbo.Stat_Realtime r
+                    WHERE
+                        (
+                            (r.Config_ID = ins.Config_ID)
+                            OR (r.Config_ID IS NULL AND ins.Config_ID IS NULL)
+                        )
+                        AND r.Stat_Time < ins.Stat_Time
+                        AND r.Total_KWH IS NOT NULL
+                    ORDER BY r.Stat_Time DESC
+                ) p
+            ),
+            spike AS (
+                SELECT
+                    Summary_ID,
+                    Stat_Time,
+                    Cur_KWH,
+                    Prev_KWH,
+                    CASE
+                        WHEN Prev_KWH IS NULL OR Prev_KWH = 0 THEN NULL
+                        ELSE (Cur_KWH - Prev_KWH) / NULLIF(Prev_KWH, 0)
+                    END AS RiseRate
+                FROM prev
+            )
+            INSERT INTO dbo.Alarm_Info
+                (Alarm_Type, Alarm_Level, Content, Occur_Time, Process_Status, Ledger_ID, Factory_ID)
+            SELECT
+                N''其他'' AS Alarm_Type, -- 兼容 CK_Alarm_Type
+                CASE WHEN s.RiseRate > 0.30 THEN N''高'' ELSE N''中'' END AS Alarm_Level,
+                CONCAT(
+                    N''总用电量突增：当前 '', CONVERT(NVARCHAR(30), s.Cur_KWH), N'' kWh；上一周期 '',
+                    CONVERT(NVARCHAR(30), s.Prev_KWH), N'' kWh；上升 '',
+                    CONVERT(NVARCHAR(10), CAST(s.RiseRate*100 AS DECIMAL(6,2))), N''%（Summary_ID='',
+                    s.Summary_ID, N''）''
+                ) AS Content,
+                s.Stat_Time AS Occur_Time,         -- ✅ 用本次插入的统计时间
+                N''未处理'' AS Process_Status,
+                NULL AS Ledger_ID,
+                NULL AS Factory_ID
+            FROM spike s
+            WHERE s.RiseRate IS NOT NULL AND s.RiseRate > 0.15;
+        END
+    ');
+END;
 
     COMMIT TRAN;
     PRINT N'Patch v4 applied successfully.';
