@@ -132,11 +132,12 @@ GO
 
 
 
--- 视图5：设备健康度视图：最近采集时间 + 最近效率 + 近7天未结案告警数（>=3表，实际多表）
+-- 视图5：设备健康度视图（PV_Device_Health）
 IF OBJECT_ID('PV_Device_Health', 'V') IS NOT NULL
     DROP VIEW PV_Device_Health;
 GO
 
+-- 最近采集时间 + 最近效率 + 近7天未结案告警数
 CREATE VIEW PV_Device_Health AS
 WITH LastGen AS (
     SELECT
@@ -282,138 +283,186 @@ IF OBJECT_ID('Check_Continuous_Deviation', 'P') IS NOT NULL
     DROP PROCEDURE Check_Continuous_Deviation;
 GO
 
-INSERT INTO PV_Model_Alert (Point_ID, Trigger_Time, Remark, Process_Status, Model_Version)
-SELECT
-    ca.Point_ID,
+IF OBJECT_ID('dbo.Check_Continuous_Deviation', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.Check_Continuous_Deviation;
+GO
 
-    -- 用连续异常段里最后一条异常明细的实际时刻
-    COALESCE(ev.EvtTime, CAST(ca.End_Date AS datetime2(0))) AS Trigger_Time,
+CREATE PROCEDURE dbo.Check_Continuous_Deviation
+AS
+BEGIN
+    SET NOCOUNT ON;
 
-    N'光伏并网点 ' + p.Point_Name +
-    N' 连续 ' + CAST(ca.Consecutive_Days AS NVARCHAR(10)) +
-    N' 天（' + CONVERT(NVARCHAR(10), ca.Start_Date, 23) + N' 至 ' +
-    CONVERT(NVARCHAR(10), ca.End_Date, 23) + N'）日发电与预测偏差率超过15%' +
-    CHAR(10) + N'模型版本: ' + ca.Model_Version +
-    CHAR(10) + N'建议检查并优化预测模型！',
-    N'待处理告警' AS Process_Status,
-    ca.Model_Version
-FROM ContinuousAlerts ca
-INNER JOIN PV_Grid_Point p ON ca.Point_ID = p.Point_ID
+    IF OBJECT_ID('dbo.PV_Model_Alert','U') IS NULL
+        RETURN;
 
--- 找到该连续段内最后一条“偏差>15%”的明细，用它的真实时间作为告警时间
-OUTER APPLY (
-    SELECT TOP (1)
-        CASE
-            WHEN TRY_CONVERT(time(0), f1.Time_Slot) IS NOT NULL
-                THEN DATEADD(SECOND, DATEDIFF(SECOND, 0, TRY_CONVERT(time(0), f1.Time_Slot)),
-                             CAST(f1.Forecast_Date AS datetime2(0)))
-            WHEN TRY_CONVERT(time(0), LEFT(CAST(f1.Time_Slot AS NVARCHAR(50)), 5)) IS NOT NULL
-                THEN DATEADD(SECOND, DATEDIFF(SECOND, 0, TRY_CONVERT(time(0), LEFT(CAST(f1.Time_Slot AS NVARCHAR(50)), 5))),
-                             CAST(f1.Forecast_Date AS datetime2(0)))
-            WHEN TRY_CONVERT(int, f1.Time_Slot) IS NOT NULL
-                THEN DATEADD(MINUTE, (TRY_CONVERT(int, f1.Time_Slot) - 1) * 5,
-                             CAST(f1.Forecast_Date AS datetime2(0)))
-            ELSE CAST(f1.Forecast_Date AS datetime2(0))
-        END AS EvtTime
-    FROM Data_PV_Forecast f1
-    WHERE f1.Point_ID = ca.Point_ID
-      AND f1.Model_Version = ca.Model_Version
-      AND CAST(f1.Forecast_Date AS date) BETWEEN ca.Start_Date AND ca.End_Date
-      AND f1.Actual_Val IS NOT NULL
-      AND f1.Forecast_Val IS NOT NULL
-      AND f1.Forecast_Val <> 0
-      AND ABS(((f1.Actual_Val - f1.Forecast_Val) / f1.Forecast_Val) * 100.0) > 15.0
-    ORDER BY CAST(f1.Forecast_Date AS date) DESC,
-             -- 时间片越晚越优先
-             CAST(f1.Time_Slot AS NVARCHAR(50)) DESC
-) ev
+    ;WITH DailyAgg AS (
+        SELECT
+            d.Point_ID,
+            CAST(d.Forecast_Date AS date) AS Forecast_Day,
+            d.Model_Version,
+            SUM(d.Actual_Val)   AS Actual_Day,
+            SUM(d.Forecast_Val) AS Forecast_Day_Val
+        FROM dbo.Data_PV_Forecast d
+        WHERE d.Model_Version IS NOT NULL
+          AND d.Forecast_Date IS NOT NULL
+          AND d.Actual_Val IS NOT NULL
+          AND d.Forecast_Val IS NOT NULL
+        GROUP BY d.Point_ID, CAST(d.Forecast_Date AS date), d.Model_Version
+    ),
+    DeviationDays AS (
+        SELECT
+            Point_ID,
+            Forecast_Day,
+            Model_Version,
+            ((Actual_Day - Forecast_Day_Val) / NULLIF(Forecast_Day_Val, 0.0)) * 100.0 AS Deviation_Rate,
+            ROW_NUMBER() OVER (PARTITION BY Point_ID, Model_Version ORDER BY Forecast_Day) AS RowNum
+        FROM DailyAgg
+        WHERE Forecast_Day_Val <> 0
+          AND ABS(((Actual_Day - Forecast_Day_Val) / NULLIF(Forecast_Day_Val, 0.0)) * 100.0) > 15.0
+    ),
+    ContinuousGroups AS (
+        SELECT
+            Point_ID,
+            Model_Version,
+            Forecast_Day,
+            DATEADD(DAY, -RowNum, Forecast_Day) AS GroupDate
+        FROM DeviationDays
+    ),
+    ContinuousAlerts AS (
+        SELECT
+            Point_ID,
+            Model_Version,
+            MIN(Forecast_Day) AS Start_Date,
+            MAX(Forecast_Day) AS End_Date,
+            COUNT(*) AS Consecutive_Days
+        FROM ContinuousGroups
+        GROUP BY Point_ID, Model_Version, GroupDate
+        HAVING COUNT(*) >= 3
+    )
+    INSERT INTO dbo.PV_Model_Alert (Point_ID, Trigger_Time, Remark, Process_Status, Model_Version)
+    SELECT
+        ca.Point_ID,
+        COALESCE(ev.EvtTime, CAST(ca.End_Date AS datetime2(0))) AS Trigger_Time,
+        CONCAT(
+            N'光伏并网点 ', p.Point_Name,
+            N' 连续 ', ca.Consecutive_Days, N' 天（',
+            CONVERT(nvarchar(10), ca.Start_Date, 23), N' 至 ', CONVERT(nvarchar(10), ca.End_Date, 23),
+            N'）日发电与预测偏差率超过15%',
+            CHAR(10), N'模型版本: ', ca.Model_Version,
+            CHAR(10), N'建议检查并优化预测模型！'
+        ),
+        N'待处理告警',
+        ca.Model_Version
+    FROM ContinuousAlerts ca
+    JOIN dbo.PV_Grid_Point p ON ca.Point_ID = p.Point_ID
 
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM PV_Model_Alert a
-    WHERE a.Point_ID = ca.Point_ID
-      AND a.Model_Version = ca.Model_Version
-      AND a.Remark LIKE N'%连续%天%预测偏差率%15%%'
-      AND DATEDIFF(DAY, a.Trigger_Time, COALESCE(ev.EvtTime, CAST(ca.End_Date AS datetime2(0)))) < 3
-);
+    OUTER APPLY (
+        SELECT TOP (1)
+            CASE
+                WHEN TRY_CONVERT(time(0), f1.Time_Slot) IS NOT NULL
+                    THEN DATEADD(SECOND, DATEDIFF(SECOND, 0, TRY_CONVERT(time(0), f1.Time_Slot)),
+                                 CAST(f1.Forecast_Date AS datetime2(0)))
+                WHEN TRY_CONVERT(time(0), LEFT(CAST(f1.Time_Slot AS nvarchar(50)), 5)) IS NOT NULL
+                    THEN DATEADD(SECOND, DATEDIFF(SECOND, 0, TRY_CONVERT(time(0), LEFT(CAST(f1.Time_Slot AS nvarchar(50)), 5))),
+                                 CAST(f1.Forecast_Date AS datetime2(0)))
+                WHEN TRY_CONVERT(int, f1.Time_Slot) IS NOT NULL
+                    THEN DATEADD(MINUTE, (TRY_CONVERT(int, f1.Time_Slot) - 1) * 5,
+                                 CAST(f1.Forecast_Date AS datetime2(0)))
+                ELSE CAST(f1.Forecast_Date AS datetime2(0))
+            END AS EvtTime
+        FROM dbo.Data_PV_Forecast f1
+        WHERE f1.Point_ID = ca.Point_ID
+          AND f1.Model_Version = ca.Model_Version
+          AND CAST(f1.Forecast_Date AS date) BETWEEN ca.Start_Date AND ca.End_Date
+          AND f1.Actual_Val IS NOT NULL
+          AND f1.Forecast_Val IS NOT NULL
+          AND f1.Forecast_Val <> 0
+          AND ABS(((f1.Actual_Val - f1.Forecast_Val) / f1.Forecast_Val) * 100.0) > 15.0
+        ORDER BY CAST(f1.Forecast_Date AS date) DESC, CAST(f1.Time_Slot AS nvarchar(50)) DESC
+    ) ev
 
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM dbo.PV_Model_Alert a
+        WHERE a.Point_ID = ca.Point_ID
+          AND a.Model_Version = ca.Model_Version
+          AND a.Remark LIKE N'%连续%天%偏差率超过15%'
+          AND DATEDIFF(DAY, a.Trigger_Time, COALESCE(ev.EvtTime, CAST(ca.End_Date AS datetime2(0)))) < 3
+    );
+END;
+GO
 
 PRINT '存储过程 Check_Continuous_Deviation 创建完成';
 GO
 
 -- 触发器2：当预测数据更新且偏差率超15%时，生成模型优化告警
-IF OBJECT_ID('TR_Model_Optimization_Alert', 'TR') IS NOT NULL
-    DROP TRIGGER TR_Model_Optimization_Alert;
+IF OBJECT_ID('dbo.TR_Model_Optimization_Alert', 'TR') IS NOT NULL
+    DROP TRIGGER dbo.TR_Model_Optimization_Alert;
 GO
 
-CREATE TRIGGER TR_Model_Optimization_Alert
-ON Data_PV_Forecast
+CREATE TRIGGER dbo.TR_Model_Optimization_Alert
+ON dbo.Data_PV_Forecast
 AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    IF UPDATE(Actual_Val)
-    BEGIN
-        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PV_Model_Alert')
-            RETURN;
+    IF NOT UPDATE(Actual_Val)
+        RETURN;
 
-        INSERT INTO PV_Model_Alert (Point_ID, Trigger_Time, Remark, Process_Status, Model_Version)
-        SELECT 
-            i.Point_ID,
+    IF OBJECT_ID('dbo.PV_Model_Alert','U') IS NULL
+        RETURN;
 
-            -- Trigger_Time 为该条记录的实际时刻
-            t.EvtTime AS Trigger_Time,
+    INSERT INTO dbo.PV_Model_Alert (Point_ID, Trigger_Time, Remark, Process_Status, Model_Version)
+    SELECT
+        i.Point_ID,
+        t.EvtTime,
+        CONCAT(
+            N'并网点 ', p.Point_Name, N' 在 ',
+            CONVERT(nvarchar(10), i.Forecast_Date, 23), N' ', CONVERT(nvarchar(50), i.Time_Slot),
+            N' 时段的预测偏差率超过15%',
+            CHAR(10), N'预测值: ', CONVERT(nvarchar(50), i.Forecast_Val), N' kWh',
+            CHAR(10), N'实际值: ', CONVERT(nvarchar(50), i.Actual_Val), N' kWh',
+            CHAR(10), N'偏差率: ', CONVERT(nvarchar(50),
+                ROUND(((i.Actual_Val - i.Forecast_Val) / NULLIF(i.Forecast_Val, 0.0)) * 100.0, 2)
+            ), N'%'
+        ),
+        N'未处理',
+        i.Model_Version
+    FROM inserted i
+    JOIN dbo.PV_Grid_Point p ON i.Point_ID = p.Point_ID
 
-            N'并网点 ' + p.Point_Name + N' 在 ' + CONVERT(NVARCHAR(10), i.Forecast_Date, 23) + 
-            N' ' + CAST(i.Time_Slot AS NVARCHAR(50)) + N' 时段的预测偏差率超过15%' + 
-            CHAR(10) + N'预测值: ' + CAST(i.Forecast_Val AS NVARCHAR(20)) + N' kWh' +
-            CHAR(10) + N'实际值: ' + CAST(i.Actual_Val AS NVARCHAR(20)) + N' kWh' +
-            CHAR(10) + N'偏差率: ' + 
-            CAST(ROUND(
-                ((i.Actual_Val - i.Forecast_Val) / NULLIF(i.Forecast_Val, 0.0)) * 100.0
-            , 2) AS NVARCHAR(20)) + N'%',
+    CROSS APPLY (
+        SELECT
+            CASE
+                WHEN TRY_CONVERT(time(0), i.Time_Slot) IS NOT NULL
+                    THEN DATEADD(SECOND, DATEDIFF(SECOND, 0, TRY_CONVERT(time(0), i.Time_Slot)),
+                                 CAST(i.Forecast_Date AS datetime2(0)))
+                WHEN TRY_CONVERT(time(0), LEFT(CONVERT(nvarchar(50), i.Time_Slot), 5)) IS NOT NULL
+                    THEN DATEADD(SECOND, DATEDIFF(SECOND, 0, TRY_CONVERT(time(0), LEFT(CONVERT(nvarchar(50), i.Time_Slot), 5))),
+                                 CAST(i.Forecast_Date AS datetime2(0)))
+                WHEN TRY_CONVERT(int, i.Time_Slot) IS NOT NULL
+                    THEN DATEADD(MINUTE, (TRY_CONVERT(int, i.Time_Slot) - 1) * 5,
+                                 CAST(i.Forecast_Date AS datetime2(0)))
+                ELSE CAST(i.Forecast_Date AS datetime2(0))
+            END AS EvtTime
+    ) t
+    WHERE i.Actual_Val IS NOT NULL
+      AND i.Forecast_Val IS NOT NULL
+      AND i.Forecast_Val <> 0
+      AND ABS(((i.Actual_Val - i.Forecast_Val) / i.Forecast_Val) * 100.0) > 15.0
+      AND NOT EXISTS (
+          SELECT 1
+          FROM dbo.PV_Model_Alert a
+          WHERE a.Point_ID = i.Point_ID
+            AND a.Model_Version = i.Model_Version
+            AND CONVERT(date, a.Trigger_Time) = i.Forecast_Date
+            AND a.Remark LIKE '%' + CONVERT(nvarchar(50), i.Time_Slot) + '%'
+            AND a.Process_Status IN (N'未处理', N'处理中', N'待处理告警')
+      );
 
-            N'未处理' AS Process_Status,
-            i.Model_Version
-        FROM inserted i
-        INNER JOIN PV_Grid_Point p ON i.Point_ID = p.Point_ID
-
-        -- 计算事件时间
-        CROSS APPLY (
-            SELECT
-                CASE
-                    WHEN TRY_CONVERT(time(0), i.Time_Slot) IS NOT NULL
-                        THEN DATEADD(SECOND, DATEDIFF(SECOND, 0, TRY_CONVERT(time(0), i.Time_Slot)),
-                                     CAST(i.Forecast_Date AS datetime2(0)))
-                    WHEN TRY_CONVERT(time(0), LEFT(CAST(i.Time_Slot AS NVARCHAR(50)), 5)) IS NOT NULL
-                        THEN DATEADD(SECOND, DATEDIFF(SECOND, 0, TRY_CONVERT(time(0), LEFT(CAST(i.Time_Slot AS NVARCHAR(50)), 5))),
-                                     CAST(i.Forecast_Date AS datetime2(0)))
-                    WHEN TRY_CONVERT(int, i.Time_Slot) IS NOT NULL
-                        THEN DATEADD(MINUTE, (TRY_CONVERT(int, i.Time_Slot) - 1) * 5,
-                                     CAST(i.Forecast_Date AS datetime2(0)))
-                    ELSE CAST(i.Forecast_Date AS datetime2(0))
-                END AS EvtTime
-        ) t
-
-        WHERE i.Actual_Val IS NOT NULL
-          AND i.Forecast_Val IS NOT NULL
-          AND i.Forecast_Val <> 0
-          AND ABS(((i.Actual_Val - i.Forecast_Val) / i.Forecast_Val) * 100.0) > 15.0
-
-          -- 避免重复告警
-          AND NOT EXISTS (
-              SELECT 1 FROM PV_Model_Alert a
-              WHERE a.Point_ID = i.Point_ID
-                AND a.Model_Version = i.Model_Version
-                AND CONVERT(date, a.Trigger_Time) = i.Forecast_Date
-                AND a.Remark LIKE '%' + CAST(i.Time_Slot AS NVARCHAR(50)) + '%'
-                AND a.Process_Status IN (N'未处理', N'处理中')
-          );
-
-        IF @@ROWCOUNT > 0
-            EXEC Check_Continuous_Deviation;
-    END
+    IF @@ROWCOUNT > 0
+        EXEC dbo.Check_Continuous_Deviation;
 END;
 GO
 

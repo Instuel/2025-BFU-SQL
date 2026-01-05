@@ -263,4 +263,148 @@ public class PvDao {
         }
         return items;
     }
+
+    // ==================== 光伏设备 CRUD 操作 ====================
+
+    /**
+     * 新增光伏设备
+     * @param deviceType 设备类型（逆变器/汇流箱）
+     * @param capacity 装机容量（kWp）
+     * @param runStatus 运行状态
+     * @param installDate 安装日期
+     * @param protocol 通信协议
+     * @param pointId 并网点ID
+     * @return 新增设备的ID，失败返回-1
+     */
+    public long insertDevice(String deviceType, Double capacity, String runStatus, 
+                             String installDate, String protocol, Long pointId) throws Exception {
+        String sql = "INSERT INTO PV_Device (Device_Type, Capacity, Run_Status, Install_Date, Protocol, Point_ID) " +
+                     "VALUES (?, ?, ?, ?, ?, ?); SELECT SCOPE_IDENTITY() AS newId;";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, deviceType);
+            if (capacity != null) {
+                ps.setDouble(2, capacity);
+            } else {
+                ps.setNull(2, java.sql.Types.DECIMAL);
+            }
+            ps.setString(3, runStatus != null ? runStatus : "正常");
+            if (installDate != null && !installDate.isEmpty()) {
+                ps.setString(4, installDate);
+            } else {
+                ps.setNull(4, java.sql.Types.DATE);
+            }
+            ps.setString(5, protocol);
+            ps.setLong(6, pointId);
+            
+            boolean hasResult = ps.execute();
+            // 跳过INSERT结果，获取SELECT结果
+            if (!hasResult) {
+                hasResult = ps.getMoreResults();
+            }
+            if (hasResult) {
+                try (ResultSet rs = ps.getResultSet()) {
+                    if (rs.next()) {
+                        return rs.getLong("newId");
+                    }
+                }
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * 更新光伏设备信息
+     * @param deviceId 设备ID
+     * @param deviceType 设备类型
+     * @param capacity 装机容量
+     * @param runStatus 运行状态
+     * @param installDate 安装日期
+     * @param protocol 通信协议
+     * @param pointId 并网点ID
+     * @return 更新是否成功
+     */
+    public boolean updateDevice(long deviceId, String deviceType, Double capacity, 
+                                String runStatus, String installDate, String protocol, Long pointId) throws Exception {
+        String sql = "UPDATE PV_Device SET Device_Type = ?, Capacity = ?, Run_Status = ?, " +
+                     "Install_Date = ?, Protocol = ?, Point_ID = ? WHERE Device_ID = ?";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, deviceType);
+            if (capacity != null) {
+                ps.setDouble(2, capacity);
+            } else {
+                ps.setNull(2, java.sql.Types.DECIMAL);
+            }
+            ps.setString(3, runStatus);
+            if (installDate != null && !installDate.isEmpty()) {
+                ps.setString(4, installDate);
+            } else {
+                ps.setNull(4, java.sql.Types.DATE);
+            }
+            ps.setString(5, protocol);
+            ps.setLong(6, pointId);
+            ps.setLong(7, deviceId);
+            
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    /**
+     * 删除光伏设备
+     * @param deviceId 设备ID
+     * @return 删除是否成功
+     */
+    public boolean deleteDevice(long deviceId) throws Exception {
+        // 先删除关联的发电数据
+        String deleteGenSql = "DELETE FROM Data_PV_Gen WHERE Device_ID = ?";
+        String deleteDeviceSql = "DELETE FROM PV_Device WHERE Device_ID = ?";
+        
+        try (Connection conn = DBUtil.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // 删除发电数据
+                try (PreparedStatement ps = conn.prepareStatement(deleteGenSql)) {
+                    ps.setLong(1, deviceId);
+                    ps.executeUpdate();
+                }
+                // 删除设备
+                try (PreparedStatement ps = conn.prepareStatement(deleteDeviceSql)) {
+                    ps.setLong(1, deviceId);
+                    int rows = ps.executeUpdate();
+                    conn.commit();
+                    return rows > 0;
+                }
+            } catch (Exception e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        }
+    }
+
+    /**
+     * 根据ID查询设备详细信息（用于编辑）
+     */
+    public Map<String, Object> findDeviceForEdit(long deviceId) throws Exception {
+        String sql = "SELECT d.Device_ID AS deviceId, d.Device_Type AS deviceType, " +
+                     "d.Capacity AS capacity, d.Run_Status AS runStatus, " +
+                     "CONVERT(VARCHAR(10), d.Install_Date, 23) AS installDate, " +
+                     "d.Protocol AS protocol, d.Point_ID AS pointId, " +
+                     "p.Point_Name AS pointName " +
+                     "FROM PV_Device d " +
+                     "JOIN PV_Grid_Point p ON d.Point_ID = p.Point_ID " +
+                     "WHERE d.Device_ID = ?";
+        try (Connection conn = DBUtil.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, deviceId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return mapRow(rs);
+                }
+            }
+        }
+        return null;
+    }
 }
