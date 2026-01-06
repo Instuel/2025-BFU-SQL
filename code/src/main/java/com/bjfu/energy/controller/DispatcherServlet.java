@@ -139,35 +139,45 @@ public class DispatcherServlet extends HttpServlet {
 
     private void handleCreateWorkOrderPage(HttpServletRequest req, HttpServletResponse resp)
             throws Exception, IOException, ServletException {
+
         String alarmIdStr = req.getParameter("alarmId");
         if (alarmIdStr == null || alarmIdStr.trim().isEmpty()) {
             resp.sendRedirect(req.getContextPath() + "/dispatcher?action=list");
             return;
         }
+
         Long alarmId = Long.valueOf(alarmIdStr);
         AlarmInfo alarm = dispatcherService.findAlarmById(alarmId);
         if (alarm == null) {
             resp.sendRedirect(buildRedirect(req.getContextPath() + "/dispatcher?action=list", "未找到对应告警"));
             return;
         }
-        
-        // 获取当前用户的dispatcher ID
-        com.bjfu.energy.entity.SysUser currentUser = (com.bjfu.energy.entity.SysUser) req.getSession().getAttribute("currentUser");
-        Long dispatcherId = null;
-        if (currentUser != null) {
-            // 查找当前用户的dispatcher角色ID
-            com.bjfu.energy.dao.RoleOandMDao roleDao = new com.bjfu.energy.dao.RoleOandMDaoImpl();
-            // 这里需要一个查找dispatcher角色的方法，暂时使用用户ID
-            dispatcherId = currentUser.getUserId();
+
+        // ✅ 关键修复：Work_Order.Dispatcher_ID 需要的是 Role_Dispatcher.Dispatcher_ID（不是 Sys_User.User_ID）
+        SysUser currentUser = (SysUser) req.getSession().getAttribute("currentUser");
+        if (currentUser == null) {
+            resp.sendRedirect(buildRedirect(req.getContextPath() + "/dispatcher?action=list", "未登录或登录已过期"));
+            return;
         }
-        
+
+        com.bjfu.energy.dao.RoleDispatcherDao roleDispatcherDao = new com.bjfu.energy.dao.RoleDispatcherDaoImpl();
+        Long dispatcherRoleId = roleDispatcherDao.findDispatcherIdByUserId(currentUser.getUserId());
+        if (dispatcherRoleId == null) {
+            resp.sendRedirect(buildRedirect(req.getContextPath() + "/dispatcher?action=list", "当前账号不是工单管理员角色，无法派发工单"));
+            return;
+        }
+
         List<SysUser> oandmUsers = dispatcherService.findOandMUsers();
+
         req.setAttribute("alarm", alarm);
         req.setAttribute("oandmUsers", oandmUsers);
-        req.setAttribute("dispatcherId", dispatcherId);
-        req.setAttribute("now", java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")));
+        req.setAttribute("dispatcherId", dispatcherRoleId);
+        req.setAttribute("now", java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")));
+
         req.getRequestDispatcher("/WEB-INF/jsp/dispatcher/workorder_create.jsp").forward(req, resp);
     }
+
 
     private void handleWorkOrderDetail(HttpServletRequest req, HttpServletResponse resp)
             throws Exception, IOException, ServletException {
@@ -278,7 +288,17 @@ public class DispatcherServlet extends HttpServlet {
         order.setAlarmId(alarmId);
         order.setLedgerId(parseLong(req.getParameter("ledgerId")));
         order.setOandmId(parseLong(req.getParameter("oandmId")));
-        order.setDispatcherId(parseLong(req.getParameter("dispatcherId")));
+        SysUser currentUser = (SysUser) req.getSession().getAttribute("currentUser");
+        if (currentUser == null) {
+            throw new IllegalStateException("未登录或登录已过期");
+        }
+        com.bjfu.energy.dao.RoleDispatcherDao roleDispatcherDao = new com.bjfu.energy.dao.RoleDispatcherDaoImpl();
+        Long dispatcherId = roleDispatcherDao.findDispatcherIdByUserId(currentUser.getUserId());
+        if (dispatcherId == null) {
+            throw new IllegalStateException("当前账号不是工单管理员角色，无法派发工单");
+        }
+        order.setDispatcherId(dispatcherId); // ✅ 强制使用正确角色ID
+
         order.setDispatchTime(parseDateTime(req.getParameter("dispatchTime")));
         order.setResultDesc(req.getParameter("resultDesc"));
         order.setReviewStatus(null);
