@@ -641,3 +641,105 @@ BEGIN CATCH
     RAISERROR(N'Patch v4 failed. Error %d, Severity %d, State %d, Line %d: %s',
               16, 1, @ErrNum, @ErrSev, @ErrSta, @ErrLine, @ErrMsg);
 END CATCH;
+
+
+    /* ------------------------------------------------------------
+       7) 存储过程：刷新并写入实时汇总（Stat_Realtime）
+       ------------------------------------------------------------ */
+IF OBJECT_ID('dbo.SP_Exec_Refresh_Realtime_Stat', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.SP_Exec_Refresh_Realtime_Stat;
+GO
+
+CREATE PROCEDURE dbo.SP_Exec_Refresh_Realtime_Stat
+    @Config_ID  BIGINT       = NULL,
+    @Factory_ID BIGINT       = NULL,
+    @Stat_Time  DATETIME2(0) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    SET @Stat_Time = COALESCE(@Stat_Time, SYSDATETIME());
+
+    DECLARE @DayStart DATETIME2(0) = DATEADD(DAY, DATEDIFF(DAY, 0, @Stat_Time), 0);
+    DECLARE @DayEnd   DATETIME2(0) = DATEADD(DAY, 1, @DayStart);
+
+    IF @Config_ID IS NULL
+        SELECT TOP (1) @Config_ID = c.Config_ID
+        FROM dbo.Dashboard_Config c
+        ORDER BY c.Config_ID;
+
+    DECLARE @Summary_ID NVARCHAR(20) =
+        CONVERT(CHAR(8), @Stat_Time, 112) + REPLACE(CONVERT(CHAR(8), @Stat_Time, 108), ':', '');
+
+    DECLARE
+        @Total_KWH           DECIMAL(12,3) = NULL,
+        @PV_Gen_KWH          DECIMAL(12,3) = NULL,
+        @Total_Water_m3      DECIMAL(12,3) = NULL,
+        @Total_Steam_t       DECIMAL(12,3) = NULL,
+        @Total_Gas_m3        DECIMAL(12,3) = NULL,
+        @Total_Alarm         INT           = 0,
+        @Alarm_High          INT           = 0,
+        @Alarm_Mid           INT           = 0,
+        @Alarm_Low           INT           = 0,
+        @Alarm_Unprocessed   INT           = 0;
+
+    /* 总用电量：优先取峰谷统计（Energy_Type='电'），无数据则为NULL */
+    SELECT
+        @Total_KWH = SUM(pv.Total_Consumption)
+    FROM dbo.Data_PeakValley pv
+    WHERE pv.Stat_Date = CONVERT(date, @Stat_Time)
+      AND ( @Factory_ID IS NULL OR pv.Factory_ID = @Factory_ID )
+      AND pv.Energy_Type = N'电';
+
+    /* 光伏发电量：取当天累计 */
+    IF OBJECT_ID('dbo.Data_PV_Gen','U') IS NOT NULL
+    BEGIN
+        SELECT
+            @PV_Gen_KWH = SUM(g.Gen_KWH)
+        FROM dbo.Data_PV_Gen g
+        WHERE g.Collect_Time >= @DayStart
+          AND g.Collect_Time <  @DayEnd
+          AND ( @Factory_ID IS NULL OR g.Factory_ID = @Factory_ID );
+    END
+
+    /* 水/蒸汽/天然气：取当天累计（Data_Energy + Energy_Meter） */
+    SELECT
+        @Total_Water_m3 = SUM(CASE WHEN m.Energy_Type = N'水'   THEN e.Value ELSE 0 END),
+        @Total_Steam_t  = SUM(CASE WHEN m.Energy_Type = N'蒸汽' THEN e.Value ELSE 0 END),
+        @Total_Gas_m3   = SUM(CASE WHEN m.Energy_Type = N'天然气' THEN e.Value ELSE 0 END)
+    FROM dbo.Data_Energy e
+    JOIN dbo.Energy_Meter m ON e.Meter_ID = m.Meter_ID
+    WHERE e.Collect_Time >= @DayStart
+      AND e.Collect_Time <  @DayEnd
+      AND ( @Factory_ID IS NULL OR e.Factory_ID = @Factory_ID );
+
+    /* 告警统计：当天累计（若存在告警表） */
+    IF OBJECT_ID('dbo.Alarm_Info','U') IS NOT NULL
+    BEGIN
+        SELECT
+            @Total_Alarm       = COUNT(*),
+            @Alarm_High        = SUM(CASE WHEN a.Alarm_Level = N'高' THEN 1 ELSE 0 END),
+            @Alarm_Mid         = SUM(CASE WHEN a.Alarm_Level = N'中' THEN 1 ELSE 0 END),
+            @Alarm_Low         = SUM(CASE WHEN a.Alarm_Level = N'低' THEN 1 ELSE 0 END),
+            @Alarm_Unprocessed = SUM(CASE WHEN a.Process_Status = N'未处理' THEN 1 ELSE 0 END)
+        FROM dbo.Alarm_Info a
+        WHERE a.Occur_Time >= @DayStart
+          AND a.Occur_Time <  @DayEnd
+          AND ( @Factory_ID IS NULL OR a.Factory_ID = @Factory_ID );
+    END
+
+    INSERT INTO dbo.Stat_Realtime
+    (Summary_ID, Stat_Time, Total_KWH, Total_Alarm, PV_Gen_KWH, Config_ID,
+     Total_Water_m3, Total_Steam_t, Total_Gas_m3,
+     Alarm_High, Alarm_Mid, Alarm_Low, Alarm_Unprocessed)
+    VALUES
+    (@Summary_ID, @Stat_Time, @Total_KWH, @Total_Alarm, @PV_Gen_KWH, @Config_ID,
+     @Total_Water_m3, @Total_Steam_t, @Total_Gas_m3,
+     @Alarm_High, @Alarm_Mid, @Alarm_Low, @Alarm_Unprocessed);
+
+    SELECT *
+    FROM dbo.Stat_Realtime
+    WHERE Summary_ID = @Summary_ID;
+END;
+GO

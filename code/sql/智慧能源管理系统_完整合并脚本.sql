@@ -1689,6 +1689,40 @@ GO
 PRINT 'Part 1: 表结构修改完成';
 GO
 
+/* ============================================================
+   Part 2: 增加索引
+   ============================================================ */
+-- 索引1：光伏预测数据表：并网点-日期-时段精准匹配索引（覆盖常用对比字段）
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Data_PV_Forecast_PointDateSlot' AND object_id = OBJECT_ID('dbo.Data_PV_Forecast'))
+    CREATE NONCLUSTERED INDEX IX_Data_PV_Forecast_PointDateSlot
+    ON dbo.Data_PV_Forecast (Point_ID, Forecast_Date, Time_Slot)
+    INCLUDE (Forecast_Val, Actual_Val, Model_Version, Analyst_ID);
+GO
+
+-- 索引2：光伏发电采集数据表：设备-采集时间倒序查询索引（支持最新数据/时间窗分析）
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Data_PV_Gen_DeviceTime' AND object_id = OBJECT_ID('dbo.Data_PV_Gen'))
+    CREATE NONCLUSTERED INDEX IX_Data_PV_Gen_DeviceTime
+    ON dbo.Data_PV_Gen (Device_ID, Collect_Time DESC)
+    INCLUDE (Gen_KWH, Grid_KWH, Self_KWH, Inverter_Eff, Point_ID);
+GO
+
+-- 索引3：光伏模型告警表：并网点-模型版本-触发时间倒序索引（告警检索与处理闭环）
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_PV_Model_Alert_PointModelTime' AND object_id = OBJECT_ID('dbo.PV_Model_Alert'))
+    CREATE NONCLUSTERED INDEX IX_PV_Model_Alert_PointModelTime
+    ON dbo.PV_Model_Alert (Point_ID, Model_Version, Trigger_Time DESC)
+    INCLUDE (Process_Status);
+GO
+
+-- 索引4：光伏设备表：设备类型-并网点筛选索引（设备清单与运行状态查询）
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_PV_Device_TypePoint' AND object_id = OBJECT_ID('dbo.PV_Device'))
+    CREATE NONCLUSTERED INDEX IX_PV_Device_TypePoint
+    ON dbo.PV_Device (Device_Type, Point_ID)
+    INCLUDE (Device_ID, Run_Status, Ledger_ID, Capacity);
+GO
+
+PRINT 'Part 2: 索引增加完成';
+GO
+
 
 /* ============================================================
    第二部分：生成变更汇总报告 (纯查询)

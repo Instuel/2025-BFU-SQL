@@ -329,3 +329,76 @@ BEGIN CATCH
     THROW 53000, @msg, 1;
 END CATCH;
 GO
+
+/* =========================
+   告警业务线存储过程：派单生成/更新工单 + 写处理日志 + 更新告警状态
+   ========================= */
+IF OBJECT_ID('dbo.SP_Alarm_Dispatch_WorkOrder', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.SP_Alarm_Dispatch_WorkOrder;
+GO
+
+CREATE PROCEDURE dbo.SP_Alarm_Dispatch_WorkOrder
+    @Alarm_ID       BIGINT,
+    @Dispatcher_ID  BIGINT,
+    @OandM_ID       BIGINT,
+    @Ledger_ID      BIGINT       = NULL,
+    @Dispatch_Time  DATETIME2(0) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    SET @Dispatch_Time = COALESCE(@Dispatch_Time, SYSDATETIME());
+
+    IF NOT EXISTS (SELECT 1 FROM dbo.Alarm_Info WHERE Alarm_ID = @Alarm_ID)
+    BEGIN
+        RAISERROR(N'告警不存在：Alarm_ID=%d', 16, 1, @Alarm_ID);
+        RETURN;
+    END
+
+    IF EXISTS (SELECT 1 FROM dbo.Alarm_Info WHERE Alarm_ID = @Alarm_ID AND Process_Status = N'已结案')
+    BEGIN
+        RAISERROR(N'告警已结案，不能派单：Alarm_ID=%d', 16, 1, @Alarm_ID);
+        RETURN;
+    END
+
+    BEGIN TRAN;
+
+        IF EXISTS (SELECT 1 FROM dbo.Work_Order WHERE Alarm_ID = @Alarm_ID)
+        BEGIN
+            UPDATE dbo.Work_Order
+            SET
+                Dispatcher_ID = @Dispatcher_ID,
+                OandM_ID      = @OandM_ID,
+                Ledger_ID     = COALESCE(@Ledger_ID, Ledger_ID),
+                Dispatch_Time = COALESCE(Dispatch_Time, @Dispatch_Time)
+            WHERE Alarm_ID = @Alarm_ID;
+        END
+        ELSE
+        BEGIN
+            INSERT INTO dbo.Work_Order
+            (Alarm_ID, OandM_ID, Dispatcher_ID, Ledger_ID, Dispatch_Time, Review_Status)
+            VALUES
+            (@Alarm_ID, @OandM_ID, @Dispatcher_ID, @Ledger_ID, @Dispatch_Time, NULL);
+        END
+
+        UPDATE dbo.Alarm_Info
+        SET Process_Status = N'处理中'
+        WHERE Alarm_ID = @Alarm_ID
+          AND Process_Status <> N'已结案';
+
+        INSERT INTO dbo.Alarm_Handling_Log
+        (Alarm_ID, Handle_Time, Status_After, OandM_ID, Dispatcher_ID)
+        VALUES
+        (@Alarm_ID, @Dispatch_Time, N'处理中', @OandM_ID, @Dispatcher_ID);
+
+    COMMIT;
+
+    SELECT TOP (1)
+        w.Order_ID, w.Alarm_ID, w.OandM_ID, w.Dispatcher_ID, w.Ledger_ID,
+        w.Dispatch_Time, w.Response_Time, w.Finish_Time, w.Review_Status
+    FROM dbo.Work_Order w
+    WHERE w.Alarm_ID = @Alarm_ID
+    ORDER BY w.Order_ID DESC;
+END;
+GO
